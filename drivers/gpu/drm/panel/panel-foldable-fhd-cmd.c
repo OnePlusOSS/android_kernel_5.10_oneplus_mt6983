@@ -474,27 +474,23 @@ static int lcm_setbacklight_cmdq(void *dsi, dcs_write_gce cb, void *handle, unsi
 
 	}
 
+	cb(dsi, handle, bl_page1, ARRAY_SIZE(bl_page1));
 	if (level > 255 && level <= 287) {
 		level = level - 32;
 		hbm_cmd[1] = 0x02;
 		if (!hbm_state) {
-				cb(dsi, handle, bl_page1, ARRAY_SIZE(bl_page1));
 			cb(dsi, handle, hbm_cmd, ARRAY_SIZE(hbm_cmd));
-				cb(dsi, handle, bl_page2, ARRAY_SIZE(bl_page2));
 		}
 		hbm_state = true;
 	} else {
 		hbm_cmd[1] = 0x00;
 		if (hbm_state){
-				cb(dsi, handle, bl_page1, ARRAY_SIZE(bl_page1));
 			cb(dsi, handle, hbm_cmd, ARRAY_SIZE(hbm_cmd));
-				cb(dsi, handle, bl_page2, ARRAY_SIZE(bl_page2));
 		}
 		hbm_state = false;
 	}
 
 	bl_level[1] = level & 0xFF;
-	cb(dsi, handle, bl_page1, ARRAY_SIZE(bl_page1));
 	cb(dsi, handle, bl_level, ARRAY_SIZE(bl_level));
 	cb(dsi, handle, bl_page2, ARRAY_SIZE(bl_page2));
 	pr_debug("[LCM][DEBUG][%s:%d]end\n", __func__, __LINE__);
@@ -507,6 +503,8 @@ static int oplus_esd_backlight_recovery(void *dsi, dcs_write_gce cb, void *handl
 	unsigned char bl_level[] = {0x51, 0xFF};
 	unsigned char hbm_cmd[] = {0x66, 0x00};
 	static bool hbm_state = false;
+	unsigned char bl_page1[] = {0xFE, 0x00};
+	unsigned char bl_page2[] = {0xFE, 0x10};
 
 	pr_debug("[LCM][DEBUG][%s:%d]start\n", __func__, __LINE__);
 
@@ -523,23 +521,26 @@ static int oplus_esd_backlight_recovery(void *dsi, dcs_write_gce cb, void *handl
 	/* end */
 
 	pr_info("[foldable-LCM][INFO][%s:%d]backlight lvl:%d\n", __func__, __LINE__, esd_brightness);
-
+	cb(dsi, handle, bl_page1, ARRAY_SIZE(bl_page1));
 	if (esd_brightness > 255 && esd_brightness <= 287) {
 		esd_brightness = esd_brightness - 32;
 		hbm_cmd[1] = 0x02;
-		if (!hbm_state)
+		if (!hbm_state) {
 			cb(dsi, handle, hbm_cmd, ARRAY_SIZE(hbm_cmd));
+		}
 		hbm_state = true;
 	} else {
 		hbm_cmd[1] = 0x00;
-		if (hbm_state)
+		if (hbm_state) {
 			cb(dsi, handle, hbm_cmd, ARRAY_SIZE(hbm_cmd));
+		}
 		hbm_state = false;
 	}
 
 	bl_level[1] = esd_brightness & 0xFF;
 
 	cb(dsi, handle, bl_level, ARRAY_SIZE(bl_level));
+	cb(dsi, handle, bl_page2, ARRAY_SIZE(bl_page2));
 
 	pr_debug("[LCM][DEBUG][%s:%d]end\n", __func__, __LINE__);
 
@@ -548,9 +549,13 @@ static int oplus_esd_backlight_recovery(void *dsi, dcs_write_gce cb, void *handl
 
 static struct mtk_panel_params ext_params = {
 	.cust_esd_check = 0,
-	.esd_check_enable = 0,
+	.esd_check_enable = 1,
+	.esd_check_multi = 0,
 	.lcm_esd_check_table[0] = {
-			.cmd = 0x0A, .count = 1, .para_list[0] = 0x9C,
+			.cmd = 0x00, .count = 1, .para_list[0] = 0x9C, .mask_list[0] = 0x9f,
+		},
+	.lcm_esd_check_table[1] = {
+			.cmd = 0x00, .count = 1, .para_list[0] = 0x80, .mask_list[0] = 0x80,
 		},
 	.lcm_color_mode = MTK_DRM_COLOR_MODE_DISPLAY_P3,
 #if _DSC_ENABLE_

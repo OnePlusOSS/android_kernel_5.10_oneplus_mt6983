@@ -62,6 +62,9 @@ static int g_color_reg_valid;
 static unsigned int g_width;
 
 bool g_legacy_color_cust;
+#ifdef OPLUS_FEATURE_DISPLAY
+extern bool g_color_probe_ready;
+#endif
 
 #define C1_OFFSET (0)
 #define color_get_offset(module) (0)
@@ -3545,6 +3548,9 @@ static int mtk_disp_color_probe(struct platform_device *pdev)
 	}
 
 	g_legacy_color_cust = false;
+#ifdef OPLUS_FEATURE_DISPLAY
+	g_color_probe_ready = true;
+#endif
 	DDPINFO("%s-\n", __func__);
 
 	return ret;

@@ -75,11 +75,6 @@ DECLARE_RESTRICTED_HOOK(android_rvh_binder_transaction,
 DECLARE_HOOK(android_vh_binder_preset,
 	TP_PROTO(struct hlist_head *hhead, struct mutex *lock),
 	TP_ARGS(hhead, lock));
-DECLARE_HOOK(android_vh_binder_proc_transaction_entry,
-	TP_PROTO(struct binder_proc *proc, struct binder_transaction *t,
-	struct binder_thread **thread, int node_debug_id, bool pending_async,
-	bool sync, bool *skip),
-	TP_ARGS(proc, t, thread, node_debug_id, pending_async, sync, skip));
 DECLARE_HOOK(android_vh_binder_proc_transaction,
 	TP_PROTO(struct task_struct *caller_task, struct task_struct *binder_proc_task,
 		struct task_struct *binder_th_task, int node_debug_id,

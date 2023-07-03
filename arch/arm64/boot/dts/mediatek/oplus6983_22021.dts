@@ -707,7 +707,7 @@
 		prevention,large_exit_condition = <8 8 2>;
 		prevention,single_channel_width = <160 160>;
 		prevention,normal_tap_condition = <10 350>;
-		prevention,long_edge_condition = <200 150 180 80>;
+		prevention,long_edge_condition = <300 150 180 80>;
 		prevention,long_strict_edge_condition = <120 60>;
 		prevention,long_fingerhold_condition = <70 6 4 4>;
 		prevention,short_edge_condition = <250 90 180 80>;
@@ -1314,7 +1314,7 @@
 		<1>, /*MTK_DRM_OPT_MMQOS_SUPPORT*/
 		<1>, /*MTK_DRM_OPT_MMDVFS_SUPPORT*/
 		<0>, /*MTK_DRM_OPT_SODI_SUPPORT*/
-		<0>, /*MTK_DRM_OPT_IDLE_MGR*/
+		<1>, /*MTK_DRM_OPT_IDLE_MGR*/
 		<0>, /*MTK_DRM_OPT_IDLEMGR_SWTCH_DECOUPLE*/
 		<1>, /*MTK_DRM_OPT_IDLEMGR_BY_REPAINT*/
 		<0>, /*MTK_DRM_OPT_IDLEMGR_ENTER_ULPS*/
@@ -1323,7 +1323,7 @@
 		<1>, /*MTK_DRM_OPT_IDLEMGR_DISABLE_ROUTINE_IRQ*/
 		<0>, /*MTK_DRM_OPT_MET_LOG*/
 		<1>, /*MTK_DRM_OPT_USE_PQ*/
-		<0>, /*MTK_DRM_OPT_ESD_CHECK_RECOVERY*/
+		<1>, /*MTK_DRM_OPT_ESD_CHECK_RECOVERY*/
 		<0>, /*MTK_DRM_OPT_ESD_CHECK_SWITCH*/
 		<1>, /*MTK_DRM_OPT_PRESENT_FENCE*/
 		<0>, /*MTK_DRM_OPT_RDMA_UNDERFLOW_AEE*/

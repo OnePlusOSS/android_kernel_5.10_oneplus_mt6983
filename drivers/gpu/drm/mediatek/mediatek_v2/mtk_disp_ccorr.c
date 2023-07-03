@@ -63,6 +63,9 @@
 //#ifdef OPLUS_BUG_STABILITY
 extern unsigned int oplus_display_brightness;
 //#endif /*OPLUS_BUG_STABILITY*/
+#ifdef OPLUS_FEATURE_DISPLAY
+extern bool g_ccorr_probe_ready;
+#endif
 static unsigned int g_ccorr_8bit_switch[DISP_CCORR_TOTAL];
 static unsigned int g_ccorr_relay_value[DISP_CCORR_TOTAL];
 
@@ -1115,7 +1118,9 @@ int led_brightness_changed_event_to_pq(struct notifier_block *nb, unsigned long 
 		/*#ifdef OPLUS_FEATURE_DISPLAY*/
 		if (!is_led_need_ccorr(led_conf->connector_id)) {
 				DDPINFO ("connector id %d no need aal\n", led_conf->connector_id);
-				led_conf->aal_enable = 0;
+				if (!strcmp("lcd-backlight1", led_conf->cdev.name)) {
+					led_conf->aal_enable = 0;
+				}
 				break;
 		}
 		/*#endif*/
@@ -1713,6 +1718,9 @@ static int mtk_disp_ccorr_probe(struct platform_device *pdev)
 #ifdef CONFIG_LEDS_BRIGHTNESS_CHANGED
 	if (comp_id == DDP_COMPONENT_CCORR0)
 		mtk_leds_register_notifier(&leds_init_notifier);
+#endif
+#ifdef OPLUS_FEATURE_DISPLAY
+	g_ccorr_probe_ready = true;
 #endif
 	DDPINFO("%s-\n", __func__);
 

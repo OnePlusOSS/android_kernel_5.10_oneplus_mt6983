@@ -491,6 +491,8 @@ struct DISP_DITHER_PARAM {
 #define DRM_MTK_AIBLD_CV_MODE 0x58
 #define DRM_MTK_GET_PANELS_INFO 0x5a
 
+#define DRM_MTK_KICK_IDLE 0x5b
+
 /* C3D */
 #define DISP_C3D_1DLUT_SIZE 32
 
@@ -1154,6 +1156,9 @@ struct mtk_drm_panels_info {
 #define DRM_IOCTL_MTK_SET_PQ_CAPS    DRM_IOWR(DRM_COMMAND_BASE + \
 			DRM_MTK_SET_PQ_CAPS, struct mtk_drm_pq_caps_info)
 
+#define DRM_IOCTL_MTK_KICK_IDLE    DRM_IOWR(DRM_COMMAND_BASE + \
+			DRM_MTK_KICK_IDLE, unsigned int)
+
 /* AAL IOCTL */
 #define AAL_HIST_BIN            33	/* [0..32] */
 #define AAL_DRE_POINT_NUM       29
@@ -1258,6 +1263,7 @@ struct DISP_AAL_HIST {
 	int srcWidth;
 	int srcHeight;
 	int pipeLineNum;
+	bool need_config;
 };
 
 #define DRM_IOCTL_MTK_AAL_INIT_REG	DRM_IOWR(DRM_COMMAND_BASE + \

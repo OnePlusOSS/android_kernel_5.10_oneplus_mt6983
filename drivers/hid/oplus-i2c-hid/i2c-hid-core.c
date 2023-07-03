@@ -707,7 +707,7 @@ static int i2c_hid_parse(struct hid_device *hid)
 
 	rsize = le16_to_cpu(hdesc->wReportDescLength);
 	if (!rsize || rsize > HID_MAX_DESCRIPTOR_SIZE) {
-		dbg_hid("weird size of report descriptor (%u)\n", rsize);
+		dbg_hid("%s : weird size of report descriptor (%u)\n", __func__, rsize);
 		return -EINVAL;
 	}
 
@@ -718,7 +718,7 @@ static int i2c_hid_parse(struct hid_device *hid)
 	} while (tries-- > 0 && ret);
 
 	if (ret) {
-		i2c_hid_err(ihid, "i2c_hid_hwreset failed.\n");
+		i2c_hid_err(ihid, "%s: i2c_hid_hwreset failed.\n", __func__);
 		return ret;
 	}
 
@@ -727,21 +727,21 @@ static int i2c_hid_parse(struct hid_device *hid)
 
 	if (use_override) {
 		rdesc = use_override;
-		i2c_hid_err(ihid, "Using a HID report descriptor override\n");
+		i2c_hid_err(ihid, "%s: Using a HID report descriptor override\n", __func__);
 	} else {
 		rdesc = kzalloc(rsize, GFP_KERNEL);
 
 		if (!rdesc) {
-			dbg_hid("couldn't allocate rdesc memory\n");
+			dbg_hid("%s: couldn't allocate rdesc memory\n", __func__);
 			return -ENOMEM;
 		}
 
-		i2c_hid_err(ihid, "asking HID report descriptor\n");
+		i2c_hid_err(ihid, "%s: asking HID report descriptor\n", __func__);
 
 		ret = i2c_hid_command(client, &hid_report_descr_cmd,
 				      rdesc, rsize);
 		if (ret) {
-			hid_err(hid, "reading report descriptor failed\n");
+			hid_err(hid, "%s: reading report descriptor failed\n", __func__);
 			kfree(rdesc);
 			return -EIO;
 		}
@@ -754,7 +754,7 @@ static int i2c_hid_parse(struct hid_device *hid)
 		kfree(rdesc);
 
 	if (ret) {
-		dbg_hid("parsing report descriptor failed\n");
+		dbg_hid("%s: parsing report descriptor failed\n", __func__);
 		return ret;
 	}
 
@@ -825,7 +825,7 @@ static int i2c_hid_init_irq(struct i2c_client *client)
 	unsigned long irqflags = 0;
 	int ret;
 
-	dev_dbg(&client->dev, "Requesting IRQ: %d\n", client->irq);
+	dev_dbg(&client->dev, "%s: Requesting IRQ: %d\n", __func__, client->irq);
 
 	if (!irq_get_trigger_type(client->irq))
 		irqflags = IRQF_TRIGGER_LOW;
@@ -857,12 +857,12 @@ static int i2c_hid_fetch_hid_descriptor(struct i2c_hid *ihid)
 		ihid->hdesc =
 			*i2c_hid_get_dmi_i2c_hid_desc_override(client->name);
 	} else {
-		i2c_hid_err(ihid, "Fetching the HID descriptor\n");
+		i2c_hid_err(ihid, "%s: Fetching the HID descriptor\n", __func__);
 		ret = i2c_hid_command(client, &hid_descr_cmd,
 				      ihid->hdesc_buffer,
 				      sizeof(struct i2c_hid_desc));
 		if (ret) {
-			dev_err(&client->dev, "hid_descr_cmd failed\n");
+			dev_err(&client->dev, "%s: hid_descr_cmd failed\n", __func__);
 			return -ENODEV;
 		}
 	}
@@ -897,11 +897,11 @@ static int i2c_hid_of_probe(struct i2c_client *client, struct i2c_hid_platform_d
 
 	ret = of_property_read_u32(dev->of_node, "hid-descr-addr", &val);
 	if (ret) {
-		dev_err(&client->dev, "HID register address not provided\n");
+		dev_err(&client->dev, "%s HID register address not provided\n", __func__);
 		return -ENODEV;
 	}
 	if (val >> 16) {
-		dev_err(&client->dev, "Bad HID register address: 0x%08x\n", val);
+		dev_err(&client->dev, "%s Bad HID register address: 0x%08x\n", __func__, val);
 		return -EINVAL;
 	}
 	pdata->hid_descriptor_address = val;
@@ -951,7 +951,7 @@ static void hid_pogopin_parse_dts(struct i2c_hid *ihid)
 	ret = device_property_read_u32(&client->dev, "hid-fw-address", &val);
 
 	if (val >> 16 || ret) {
-		dev_err(&client->dev, "Bad HID fw address: 0x%08x\n", val);
+		dev_err(&client->dev, "%s Bad HID fw address: 0x%08x\n", __func__, val);
 		return;
 	}
 
@@ -1251,14 +1251,14 @@ const struct firmware *get_fw_firmware(struct i2c_hid *ihid, const char *patch)
 	do {
 		ret = request_firmware(&fw_entry, fw_patch, &client->dev);
 		if(ret < 0) {
-			i2c_hid_err(ihid, "Failed to request fw\n");
+			i2c_hid_err(ihid, "%s: Failed to request fw\n", __func__);
 			msleep(100);
 		} else {
 			break;
 		}
 	} while ((ret < 0) && (--retry > 0));
 
-	i2c_hid_err(ihid, "fw_path is [%s]\n", fw_patch);
+	i2c_hid_err(ihid, "%s: fw_path is [%s]\n", __func__, fw_patch);
 	kfree(fw_patch);
 	return fw_entry;
 }
@@ -1284,7 +1284,7 @@ static bool Check_kpdmcu_fw_update(struct i2c_hid *ihid)
 		msleep(5);
 		ret = hid_fw_update_cmd_send_recv(client, client->addr, send_mask_cmd, 1, recv_buf, 1);
 		if (ret || (recv_buf[0] == 0xFF)) {
-			i2c_hid_err(ihid, "read kpdmcu fw_version  fail, retry = %d\n", retry);
+			i2c_hid_err(ihid, "%s: read kpdmcu fw_version  fail, retry = %d\n", __func__, retry);
 			msleep(10);
 		} else {
 			ihid->kpdmcu_fw_mcu_version = recv_buf[0];
@@ -1293,8 +1293,8 @@ static bool Check_kpdmcu_fw_update(struct i2c_hid *ihid)
 	} while (--retry);
 
 
-	i2c_hid_err(ihid, "kpad mcu version is %d, fw version is %d\n",
-			    ihid->kpdmcu_fw_mcu_version, ihid->kpdmcu_fw_data_ver);
+	i2c_hid_err(ihid, "%s: kpad mcu version is %d, fw version is %d\n",
+			    __func__, ihid->kpdmcu_fw_mcu_version, ihid->kpdmcu_fw_data_ver);
 
 	if(ihid->kpdmcu_fw_mcu_version != ihid->kpdmcu_fw_data_ver)
 		return true;
@@ -1342,7 +1342,6 @@ static int kpdmcu_enter_fw_mode(struct i2c_hid *ihid)
 	return 0;
 }
 
-
 static int padmcu_read_panel_mcu_fw(struct i2c_hid *ihid)
 {
 	struct i2c_client *client = ihid->client;
@@ -1365,7 +1364,7 @@ static int padmcu_read_panel_mcu_fw(struct i2c_hid *ihid)
 		return ret < 0 ? ret : -EIO;
 	}
 	ihid->padmcu_fw_mcu_version = recv_buf[0];
-	dev_info(&client->dev, "padmcu fw version is %d\n", ihid->padmcu_fw_mcu_version);
+	dev_info(&client->dev, "%s padmcu fw version is %d\n", __func__, ihid->padmcu_fw_mcu_version);
 
 	return 0;
 }
@@ -1396,14 +1395,14 @@ static int padmcu_enter_fw_mode(struct i2c_hid *ihid)
 	msleep(5);
 	ret = hid_fw_update_cmd_send_recv(client, ihid->hid_fw_address, send_cmd, 4, NULL, 0);
 	if (ret) {
-		i2c_hid_err(ihid, "%s send cmd fail\n", __func__);
+		i2c_hid_err(ihid, "%s hid_fw_address send cmd fail\n", __func__);
 		return ret;
 	}
 
 	msleep(5);
 	ret = hid_fw_update_cmd_send_recv(client, ihid->hid_fw_address, send_mask_cmd, 1, recv_buf, 1);
 	if (ret || (recv_buf[0] != 0x01)) {
-		i2c_hid_err(ihid, "%s send mask_cmd fail\n", __func__);
+		i2c_hid_err(ihid, "%s hid_fw_address send mask_cmd fail\n", __func__);
 		return ret < 0 ? ret : -EIO;
 	}
 
@@ -1471,7 +1470,6 @@ static int kpdmcu_clear_fw_area(struct i2c_hid *ihid, u32 count)
 
 	return 0;
 }
-
 
 static int padmcu_clear_fw_area(struct i2c_hid *ihid, u32 count)
 {
@@ -1652,7 +1650,6 @@ static int kpdmcu_write_fw_update(struct i2c_hid *ihid, const unsigned char *fw_
 	return 0;
 }
 
-
 static int padmcu_write_fw_update(struct i2c_hid *ihid, const unsigned char *fw_data, u32 count)
 {
 	struct i2c_client *client = ihid->client;
@@ -1747,7 +1744,6 @@ static int kpdmcu_check_fw_area(struct i2c_hid *ihid, u32 count)
 
 }
 
-
 static int padmcu_check_fw_area(struct i2c_hid *ihid, u32 count)
 {
 	/*SL:0X4,SH:0X81,SCL:0Xfb,SCH:0X7e,add:0x70*/
@@ -1786,7 +1782,6 @@ static int padmcu_check_fw_area(struct i2c_hid *ihid, u32 count)
 	}
 
 	return 0;
-
 }
 
 static int kpdmcu_reset_mcu(struct i2c_hid *ihid)
@@ -1811,9 +1806,7 @@ static int kpdmcu_reset_mcu(struct i2c_hid *ihid)
 		return ret < 0 ? ret : -EIO;
 	}
 	return 0;
-
 }
-
 
 static int padmcu_reset_mcu(struct i2c_hid *ihid)
 {
@@ -1837,7 +1830,6 @@ static int padmcu_reset_mcu(struct i2c_hid *ihid)
 		return ret < 0 ? ret : -EIO;
 	}
 	return 0;
-
 }
 
 static void init_i2c_hid_proc(struct i2c_hid *ihid)
@@ -1896,7 +1888,6 @@ static void init_i2c_hid_proc(struct i2c_hid *ihid)
 		if (prEntry_tmp == NULL) {
 			i2c_hid_err(ihid, "%s: create kpdmcu_sn proc entry failed.\n", __func__);
 		}
-
 	}
 
 	return;
@@ -1911,14 +1902,14 @@ static int Touchmcu_getreport(struct i2c_hid *ihid,u8 reportId, u8 *buf)
 	ret = i2c_hid_raw_request(ihid->hid, rcv_buf[0], rcv_buf, GDIX_OUT_PUT_REPORT_SIZE,  HID_FEATURE_REPORT,  HID_REQ_GET_REPORT);
 	msleep(12);
 	if (ret < 0) {
-		i2c_hid_err(ihid, "failed get feature retry, ret=%d\n", ret);
+		i2c_hid_err(ihid, "%s failed get feature retry, ret=%d\n", __func__, ret);
 		return ret;
 	} else {
 		if (rcv_buf[0] == reportId) {
 			memcpy(buf, rcv_buf, GDIX_OUT_PUT_REPORT_SIZE);
 			return 0;
 		} else {
-			i2c_hid_err(ihid, "Get Wrong reportId:id=0x%x\n", rcv_buf[0]);
+			i2c_hid_err(ihid, "%s Get Wrong reportId:id=0x%x\n", __func__, rcv_buf[0]);
 			return ret < 0 ? ret : -EIO;
 		}
 	}
@@ -1939,7 +1930,7 @@ static int Touchmcu_write(struct i2c_hid *ihid, const u8 *buf,u32 len)
 		ret = i2c_hid_raw_request(ihid->hid, temp_buf[0], temp_buf, len,  HID_FEATURE_REPORT, HID_REQ_SET_REPORT);
 		msleep(12);
 		if (ret < 0) {
-			i2c_hid_err(ihid, "failed set feature, retry: ret=%d,retry:%d\n", ret,retry);
+			i2c_hid_err(ihid, "%s failed set feature, retry: ret=%d,retry:%d\n", __func__, ret,retry);
 			msleep(10);
 		} else {
 			break;
@@ -1960,22 +1951,22 @@ static int Touchmcu_WriteSpeCmd(struct i2c_hid *ihid, const u8 *buf,u32 len)
 
 	if (len > GDIX_OUT_PUT_REPORT_SIZE)
 		return -1;
+
 	memset(temp_buf, 0, GDIX_OUT_PUT_REPORT_SIZE);
 	memcpy(&temp_buf[0], buf, len);
 	do {
 		ret = i2c_hid_raw_request(ihid->hid, temp_buf[0], temp_buf, len,  HID_FEATURE_REPORT, HID_REQ_SET_REPORT);
 		msleep(12);
 		if (ret < 0) {
-			i2c_hid_err(ihid, "failed set feature, retry: ret=%d,retry:%d\n", ret,retry);
+			i2c_hid_err(ihid, "%s failed set feature, retry: ret=%d,retry:%d\n", __func__, ret,retry);
 			msleep(10);
 		} else {
 			break;
 		}
 	} while(--retry);
+
 	return ret;
-
 }
-
 
 int Touchmcu_write_cmd(struct i2c_hid *ihid, u16 addr, const u8 *buf, u32 len)
 {
@@ -2010,8 +2001,8 @@ int Touchmcu_write_cmd(struct i2c_hid *ihid, u16 addr, const u8 *buf, u32 len)
 		memcpy(&tmpBuf[GDIX_PRE_HEAD_LEN + GDIX_DATA_HEAD_LEN], &buf[pos], transfer_length);
 		ret = Touchmcu_write(ihid, tmpBuf, transfer_length + GDIX_PRE_HEAD_LEN + GDIX_DATA_HEAD_LEN);
 		if (ret < 0) {
-			i2c_hid_err(ihid, "Failed write data to addr=0x%x, len=%d,ret = %d\n",
-				current_addr, transfer_length, ret);
+			i2c_hid_err(ihid, "%s Failed write data to addr=0x%x, len=%d,ret = %d\n",
+				__func__, current_addr, transfer_length, ret);
 			break;
 		} else {
 			pos += transfer_length;
@@ -2023,7 +2014,6 @@ int Touchmcu_write_cmd(struct i2c_hid *ihid, u16 addr, const u8 *buf, u32 len)
 	else
 		return len;
 }
-
 
 static int Touchmcu_readpkg(struct i2c_hid *ihid, u16 addr, u8 *buf, u32 len)
 {
@@ -2049,19 +2039,19 @@ re_start:
 	ret = Touchmcu_write(ihid, HidBuf, 10);
 
 	if (ret < 0) {
-		i2c_hid_err(ihid, "Failed send read start package, ret = %d\n", ret);
+		i2c_hid_err(ihid, "%s Failed send read start package, ret = %d\n", __func__, ret);
 		return -1;
 	}
 	do {
 		ret = Touchmcu_getreport(ihid, 0x0e, HidBuf);
 		if (ret) {
-			i2c_hid_err(ihid, "Failed read addr=0x%x, len=%d\n", addr, len);
+			i2c_hid_err(ihid, "%s Failed read addr=0x%x, len=%d\n", __func__, addr, len);
 			break;
 		} else {
 			if (pkg_index != HidBuf[3]) {
 				if (retry++ < GDIX_RETRY_TIMES) {
-					i2c_hid_err(ihid, "Read retry %d, pkg_index %d != HidBuf[3](%d)\n",
-						 retry,pkg_index, HidBuf[3]);
+					i2c_hid_err(ihid, "%s Read retry %d, pkg_index %d != HidBuf[3](%d)\n",
+						 __func__, retry,pkg_index, HidBuf[3]);
 					msleep(1);
 					goto re_start;
 				}
@@ -2073,10 +2063,10 @@ re_start:
 					read_data_len += HidBuf[4];
 					pkg_index++;
 				} else {
-					i2c_hid_err(ihid, "Data length err: %d != %d\n",
-						 HidBuf[4], len - read_data_len);
+					i2c_hid_err(ihid, "%s Data length err: %d != %d\n",
+						 __func__, HidBuf[4], len - read_data_len);
 					if (retry++ < GDIX_RETRY_TIMES) {
-						i2c_hid_err(ihid, "Read retry: %d\n", retry);
+						i2c_hid_err(ihid, "%s Read retry: %d\n", __func__, retry);
 						msleep(1);
 						goto re_start;
 					}
@@ -2091,7 +2081,6 @@ re_start:
 	else
 		return len;
 }
-
 
 static int Touchmcu_read(struct i2c_hid *ihid, u16 addr, u8 *buf, u32 len)
 {
@@ -2121,7 +2110,6 @@ static int Touchmcu_read(struct i2c_hid *ihid, u16 addr, u8 *buf, u32 len)
 	return ret;
 }
 
-
 static u8 Get_touch_update_flag(const unsigned char *fw_data, u32 count)
 {
 	return (u8)(fw_data[count + 6 + 2]);
@@ -2141,14 +2129,14 @@ static bool Check_touchmcu_fw_update(struct i2c_hid *ihid)
 	do {
 		ret = Touchmcu_read(ihid, CFG_START_ADDR, &mcu_cfg_ver, 1);
 		if (ret < 0) {
-			i2c_hid_err(ihid, "read_touchpad_fw_version cmd fail, retry is %d\n", retry);
+			i2c_hid_err(ihid, "%s read_touchpad_fw_version cmd fail, retry is %d\n", __func__, retry);
 			continue;
 		} else {
 			ihid->touchmcu_fw_mcu_version = mcu_cfg_ver;
 		}
 		ret = Touchmcu_read(ihid, VER_ADDR, fw_info, sizeof(fw_info));
 		if(ret < 0) {
-			i2c_hid_err(ihid, "read_touchpad_fw_version cmd fail, retry is %d\n", retry);
+			i2c_hid_err(ihid, "%s read_touchpad_fw_version cmd fail, retry is %d\n", __func__, retry);
 		} else {
 			ihid->touchmcu_cid_version_major = fw_info[18];
 			ihid->touchmcu_cid_version_minor = (fw_info[19] << 8) | fw_info[20];
@@ -2182,7 +2170,7 @@ static int Touchmcu_switch_to_patch_mode(struct i2c_hid *ihid)
 	do {
 		ret = Touchmcu_write(ihid, buf_switch_to_patch, 6);
 		if (ret < 0) {
-			i2c_hid_err(ihid, "Failed send switch to patch\n");
+			i2c_hid_err(ihid, "%s Failed send switch to patch\n", __func__);
 			msleep(50);
 			continue;
 		}
@@ -2190,13 +2178,13 @@ static int Touchmcu_switch_to_patch_mode(struct i2c_hid *ihid)
 		temp_buf[0] = 0;
 		ret = Touchmcu_read(ihid, BL_STATE_ADDR, temp_buf, 1);
 		if (ret >= 0 && temp_buf[0] == 0xDD) {
-			i2c_hid_err(ihid, "switch to patch mode\n");
+			i2c_hid_err(ihid, "%s switch to patch mode\n", __func__);
 			return 0;
 		}
-		i2c_hid_err(ihid, "retry send switch patch mode cmd, ret %d, value 0x%x\n", ret, temp_buf[0]);
+		i2c_hid_err(ihid, "%s retry send switch patch mode cmd, ret %d, value 0x%x\n", __func__, ret, temp_buf[0]);
 	} while (--retry);
 
-	i2c_hid_err(ihid, "failed switch to patch mode\n");
+	i2c_hid_err(ihid, "%s failed switch to patch mode\n", __func__);
 	return ret < 0 ? ret : -EIO;
 }
 
@@ -2220,26 +2208,26 @@ static int Touchmcu_disable_report(struct i2c_hid *ihid)
 		msleep(10);
 		ret = Touchmcu_write_cmd(ihid, CMD_ADDR, chk_state_cmd, 5);
 		if (ret < 0) {
-			i2c_hid_err(ihid, "failed send get state cmd. ret = %d. retry", ret);
+			i2c_hid_err(ihid, "%s failed send get state cmd. ret = %d. retry", __func__, ret);
 			continue;
 		}
 		msleep(50);
 		ret = Touchmcu_read(ihid, CMD_ADDR, cmd_ack_buf, 3);
 		if (ret < 0) {
-			i2c_hid_err(ihid, "failed read cmd state, %d. retry", ret);
+			i2c_hid_err(ihid, "%s failed read cmd state, %d. retry", __func__, ret);
 			continue;
 		}
 
 		checksum = 0x36 + cmd_ack_buf[1] + cmd_ack_buf[2];
 		if (checksum) {
-			i2c_hid_err(ihid, "cmd ack checksum error, cheksum 0x%x, ack %x %x %x",
-					checksum, cmd_ack_buf[0], cmd_ack_buf[1], cmd_ack_buf[2]);
+			i2c_hid_err(ihid, "%s cmd ack checksum error, cheksum 0x%x, ack %x %x %x",
+					__func__, checksum, cmd_ack_buf[0], cmd_ack_buf[1], cmd_ack_buf[2]);
 			continue;
 		}
 		if (cmd_ack_buf[1] == 0x01) {
 			return 0;
 		}
-		i2c_hid_err(ihid, "invalid cmd ack data 0x%x", cmd_ack_buf[1]);
+		i2c_hid_err(ihid, "%s invalid cmd ack data 0x%x", __func__, cmd_ack_buf[1]);
 	}
 	return ret < 0 ? ret : -EIO;
 }
@@ -2274,8 +2262,8 @@ static int Touchmcu_load_sub_firmware(struct i2c_hid *ihid, u32 flash_addr,const
 
 		ret = Touchmcu_write_cmd(ihid, FLASH_BUFFER_ADDR, &fw_data[load_data_len], unitlen);
 		if (ret < 0) {
-			i2c_hid_err(ihid, "Failed load fw, len %d : addr 0x%x, ret=%d\n",
-				 unitlen, flash_addr, ret);
+			i2c_hid_err(ihid, "%s Failed load fw, len %d : addr 0x%x, ret=%d\n",
+				 __func__, unitlen, flash_addr, ret);
 			goto load_fail;
 		}
 
@@ -2293,7 +2281,7 @@ static int Touchmcu_load_sub_firmware(struct i2c_hid *ihid, u32 flash_addr,const
 
 		ret = Touchmcu_write(ihid, buf_load_flash, 11);
 		if (ret < 0) {
-			i2c_hid_err(ihid, "Failed write load flash command, ret =%d\n", ret);
+			i2c_hid_err(ihid, "%s Failed write load flash command, ret =%d\n", __func__, ret);
 			goto load_fail;
 		}
 
@@ -2358,12 +2346,12 @@ static int Touchmcu_flash_cfg_with_isp(struct i2c_hid *ihid, const unsigned char
 
 	/* Start load config */
 	if (!fw_data) {
-		i2c_hid_err(ihid, "No valid fw data \n");
+		i2c_hid_err(ihid, "%s No valid fw data \n", __func__);
 		return ret < 0 ? ret : -EIO;
 	}
 
 	//fw_data[FW_IMAGE_SUB_FWNUM_OFFSET];
-	i2c_hid_err(ihid, "load sub config, sub_cfg_num=%d\n", sub_cfg_num);
+	i2c_hid_err(ihid, "%s load sub config, sub_cfg_num=%d\n", __func__, sub_cfg_num);
 	for (i = 0; i < sub_cfg_num; i++) {
 		sub_cfg_id = fw_data[sub_cfg_info_pos];
 		i2c_hid_err(ihid, "load sub config, sub_cfg_id=0x%x\n", sub_cfg_id);
@@ -2374,7 +2362,7 @@ static int Touchmcu_flash_cfg_with_isp(struct i2c_hid *ihid, const unsigned char
 		if(sub_cfg_id == TOUCH_SENSOR_ID){
 			cfg = &fw_data[cfg_offset];
 			cfg_ver_infile = cfg[0];
-			i2c_hid_err(ihid, "Find a cfg match cfg version=%d\n", cfg_ver_infile);
+			i2c_hid_err(ihid, "%s Find a cfg match cfg version=%d\n", __func__, cfg_ver_infile);
 			break;
 		}
 
@@ -2384,14 +2372,14 @@ static int Touchmcu_flash_cfg_with_isp(struct i2c_hid *ihid, const unsigned char
 
 	if (!cfg) {
 		/* failed found config for sensorID */
-		i2c_hid_err(ihid, "Failed found config sub_cfg_num %d\n",
-				sub_cfg_num);
+		i2c_hid_err(ihid, "%s Failed found config sub_cfg_num %d\n",
+				__func__, sub_cfg_num);
 		return ret < 0 ? ret : -EIO;
 	}
 
-	i2c_hid_err(ihid, "load cfg addr len:0x%x\n", sub_cfg_len);
+	i2c_hid_err(ihid, "%s load cfg addr len:0x%x\n", __func__, sub_cfg_len);
 	if (sub_cfg_len > sizeof(cfg_4K)) {
-		i2c_hid_err(ihid, "invalid cfg len %d", sub_cfg_len);
+		i2c_hid_err(ihid, "%s invalid cfg len %d", __func__, sub_cfg_len);
 		return ret < 0 ? ret : -EIO;
 	}
 	// for Normandy serial device need align cfg to 4KB when flash with ISP
@@ -2399,7 +2387,7 @@ static int Touchmcu_flash_cfg_with_isp(struct i2c_hid *ihid, const unsigned char
 	memcpy(cfg_4K, cfg, sub_cfg_len);
 	ret = Touchmcu_load_sub_firmware(ihid, CFG_FLASH_ADDR, cfg_4K, sizeof(cfg_4K));
 	if (ret < 0) {
-		i2c_hid_err(ihid, "Failed flash cofig with ISP, ret=%d\n", ret);
+		i2c_hid_err(ihid, "%s Failed flash cofig with ISP, ret=%d\n", __func__, ret);
 		return ret;
 	}
 	return 0;
@@ -2422,33 +2410,33 @@ static int _touchmcu_fw_update(struct i2c_hid *ihid, const unsigned char *fw_dat
 	if (Touchmcu_switch_to_patch_mode(ihid)) {
 		goto update_err;
 	}
-	i2c_hid_err(ihid, "success switch to patch mode\n");
+	i2c_hid_err(ihid, "%s success switch to patch mode\n", __func__);
 
 	if (Touchmcu_disable_report(ihid)) {
 		// just ignore this error
-		i2c_hid_err(ihid, "failed disable touch report\n");
+		i2c_hid_err(ihid, "%s failed disable touch report\n", __func__);
 		//goto update_err;
 	} else {
-		i2c_hid_err(ihid, "success disable touch report\n");
+		i2c_hid_err(ihid, "%s success disable touch report\n", __func__);
 	}
 
 	/* Start update */
 	ret = Touchmcu_write(ihid, buf_start_update, 6);
 	if (ret < 0) {
-		i2c_hid_err(ihid, "Failed start update, ret=%d\n", ret);
+		i2c_hid_err(ihid, "%s Failed start update, ret=%d\n", __func__, ret);
 		goto update_err;
 	}
 	msleep(100);
 
-	i2c_hid_err(ihid, "start update fw");
+	i2c_hid_err(ihid, "%s start update fw", __func__);
 	sub_fw_info_pos = GTX8_SUB_FW_INFO_OFFSET;
 	sub_fw_num = fw_data[GTX8_FW_IMAGE_SUB_FWNUM_OFFSET];
-	i2c_hid_err(ihid, "load sub firmware, sub_fw_num=%d\n", sub_fw_num);
+	i2c_hid_err(ihid, "%s load sub firmware, sub_fw_num=%d\n", __func__, sub_fw_num);
 
 	/* load normal firmware package */
 	for (i = 0; i < sub_fw_num; i++) {
 		sub_fw_type = fw_data[sub_fw_info_pos];
-		i2c_hid_err(ihid, "load sub firmware, sub_fw_type=0x%x\n", sub_fw_type);
+		i2c_hid_err(ihid, "%s load sub firmware, sub_fw_type=0x%x\n", __func__, sub_fw_type);
 		sub_fw_len = (fw_data[sub_fw_info_pos + 1] << 24) | (fw_data[sub_fw_info_pos + 2] << 16) |
 					    (fw_data[sub_fw_info_pos + 3] << 8) | fw_data[sub_fw_info_pos + 4];
 
@@ -2456,8 +2444,8 @@ static int _touchmcu_fw_update(struct i2c_hid *ihid, const unsigned char *fw_dat
 		sub_fw_flash_addr = sub_fw_flash_addr << 8;
 
 		if (!(0x0C & (0x01 << sub_fw_type ))){
-			i2c_hid_err(ihid, "Sub firmware type does not math:type=%d\n",
-				  sub_fw_type);
+			i2c_hid_err(ihid, "%s Sub firmware type does not math:type=%d\n",
+				  __func__, sub_fw_type);
 			fw_image_offset += sub_fw_len;
 			sub_fw_info_pos += 8;
 			continue;
@@ -2465,10 +2453,10 @@ static int _touchmcu_fw_update(struct i2c_hid *ihid, const unsigned char *fw_dat
 
 		/* if sub fw type is HID subsystem we need compare version before update */
 		// TODO update hid subsystem
-		i2c_hid_err(ihid, "load sub firmware addr:0x%x,len:0x%x\n",sub_fw_flash_addr,sub_fw_len);
+		i2c_hid_err(ihid, "%s load sub firmware addr:0x%x,len:0x%x\n", __func__, sub_fw_flash_addr, sub_fw_len);
 		ret = Touchmcu_load_sub_firmware(ihid, sub_fw_flash_addr, &fw_data[fw_image_offset], sub_fw_len);
 		if (ret < 0) {
-			i2c_hid_err(ihid, "Failed load sub firmware, ret=%d\n", ret);
+			i2c_hid_err(ihid, "%s Failed load sub firmware, ret=%d\n", __func__, ret);
 			goto update_err;
 		}
 		fw_image_offset += sub_fw_len;
@@ -2489,16 +2477,16 @@ static int _touchmcu_fw_update(struct i2c_hid *ihid, const unsigned char *fw_dat
 		cfg_flash = true;
 		ret = Touchmcu_flash_cfg_with_isp(ihid, fw_data, count, flag);
 		if (ret < 0) {
-			i2c_hid_err(ihid, "failed flash config with isp, ret %d\n", ret);
+			i2c_hid_err(ihid, "%s failed flash config with isp, ret %d\n", __func__, ret);
 			goto update_err;
 		}
-		i2c_hid_err(ihid, "success flash config with isp\n");
+		i2c_hid_err(ihid, "%s success flash config with isp\n", __func__);
 	}
 
 	ihid->fw_update_progress = FW_PROGRESS_99 * FW_PERCENTAGE_100;
 
 	/* reset IC */
-	i2c_hid_err(ihid, "flash fw finish, reset ic ret = %d\n", ret);
+	i2c_hid_err(ihid, "%s flash fw finish, reset ic ret = %d\n", __func__, ret);
 	retry = 3;
 	do {
 		ret = Touchmcu_write(ihid, buf_restart, 6);
@@ -2507,7 +2495,7 @@ static int _touchmcu_fw_update(struct i2c_hid *ihid, const unsigned char *fw_dat
 		msleep(20);
 	} while(--retry);
 	if (retry == 0 && ret < 0)
-		i2c_hid_err(ihid, "Failed write restart command, ret=%d\n", ret);
+		i2c_hid_err(ihid, "%s Failed write restart command, ret=%d\n", __func__, ret);
 	else
 		ret = 0;
 
@@ -2515,16 +2503,16 @@ static int _touchmcu_fw_update(struct i2c_hid *ihid, const unsigned char *fw_dat
 
 	ret = Touchmcu_WriteSpeCmd(ihid, buf_switch_ptp_mode, 6);
 	if (ret < 0) {
-		i2c_hid_err(ihid, "Failed switch to ptp mode\n");
+		i2c_hid_err(ihid, "%s Failed switch to ptp mode\n", __func__);
 	} else {
-		i2c_hid_err(ihid, "switch to ptp mode, ret=%d\n", ret);
+		i2c_hid_err(ihid, "%s switch to ptp mode, ret=%d\n", __func__, ret);
 		ret = 0;
 	}
 	return ret;
 
 update_err:
 	/* reset IC */
-	i2c_hid_err(ihid, "update failed, reset ic\n");
+	i2c_hid_err(ihid, "%s update failed, reset ic\n", __func__);
 	retry = 3;
 	do {
 		ret = Touchmcu_write(ihid, buf_restart, 6);
@@ -2533,7 +2521,7 @@ update_err:
 		msleep(20);
 	} while(--retry);
 	if (!retry)
-		i2c_hid_err(ihid, "Failed write restart command, ret=%d\n", ret);
+		i2c_hid_err(ihid, "%s Failed write restart command, ret=%d\n", __func__, ret);
 
 	msleep(300);
 	Touchmcu_enable_report(ihid);
@@ -2561,20 +2549,20 @@ static int Touchmcu_cfg_update(struct i2c_hid *ihid, const unsigned char *fw_dat
 
 	//before update config,read curr config version
 	Touchmcu_read(ihid, CFG_START_ADDR, cfg_ver_before,3);
-	i2c_hid_err(ihid, "Before update,cfg version is 0x%02x 0x%02x 0x%02x\n",
-		cfg_ver_before[0],cfg_ver_before[1],cfg_ver_before[2]);
+	i2c_hid_err(ihid, "%s Before update,cfg version is 0x%02x 0x%02x 0x%02x\n",
+		__func__, cfg_ver_before[0], cfg_ver_before[1], cfg_ver_before[2]);
 
 	/* Start load config */
 	if (!fw_data) {
-		i2c_hid_err(ihid, "No valid fw data \n");
+		i2c_hid_err(ihid, "%s No valid fw data \n", __func__);
 		return ret < 0 ? ret : -EIO;
 	}
 
 	//fw_data[FW_IMAGE_SUB_FWNUM_OFFSET];
-	i2c_hid_err(ihid, "load sub config, sub_cfg_num=%d\n", sub_cfg_num);
+	i2c_hid_err(ihid, "%s load sub config, sub_cfg_num=%d\n", __func__, sub_cfg_num);
 	for (i = 0; i < sub_cfg_num; i++) {
 		sub_cfg_id = fw_data[sub_cfg_info_pos];
-		i2c_hid_err(ihid, "load sub config, sub_cfg_id=0x%x\n", sub_cfg_id);
+		i2c_hid_err(ihid, "%s load sub config, sub_cfg_id=0x%x\n", __func__, sub_cfg_id);
 
 		sub_cfg_len = (fw_data[sub_cfg_info_pos + 1] << 8) |
 						    fw_data[sub_cfg_info_pos + 2];
@@ -2583,7 +2571,7 @@ static int Touchmcu_cfg_update(struct i2c_hid *ihid, const unsigned char *fw_dat
 			findMatchCfg = true;
 			cfg = &fw_data[cfg_offset];
 			cfg_ver_infile = cfg[0];
-			i2c_hid_err(ihid, "Find a cfg match cfg version=%d\n", cfg_ver_infile);
+			i2c_hid_err(ihid, "%s Find a cfg match cfg version=%d\n", __func__, cfg_ver_infile);
 			break;
 		}
 		cfg_offset += sub_cfg_len;
@@ -2591,7 +2579,7 @@ static int Touchmcu_cfg_update(struct i2c_hid *ihid, const unsigned char *fw_dat
 	}
 
 	if(!findMatchCfg) {
-		i2c_hid_err(ihid, "no config found for sensorID %d\n", TOUCH_SENSOR_ID);
+		i2c_hid_err(ihid, "%s no config found for sensorID %d\n", __func__, TOUCH_SENSOR_ID);
 		return CFG_NOT_MATCH;
 	}
 
@@ -2600,16 +2588,16 @@ static int Touchmcu_cfg_update(struct i2c_hid *ihid, const unsigned char *fw_dat
 	do {
 		ret = Touchmcu_read(ihid, CMD_ADDR, temp_buf, 1);
 		if (ret < 0) {
-			i2c_hid_err(ihid, "Failed read cfg cmd, ret = %d\n", ret);
+			i2c_hid_err(ihid, "%s Failed read cfg cmd, ret = %d\n", __func__, ret);
 			return ret;
 		}
 		if (temp_buf[0] == 0xff)
 			break;
-		i2c_hid_err(ihid, "0x%x value is 0x%x != 0xff, retry\n", CMD_ADDR, temp_buf[0]);
+		i2c_hid_err(ihid, "%s 0x%x value is 0x%x != 0xff, retry\n", __func__, CMD_ADDR, temp_buf[0]);
 		msleep(10);
 	} while (--retry);
 	if (!retry) {
-		i2c_hid_err(ihid, "Reg 0x%x != 0xff\n", CMD_ADDR);
+		i2c_hid_err(ihid, "%s Reg 0x%x != 0xff\n", __func__, CMD_ADDR);
 		return ret < 0 ? ret : -EIO;
 	}
 
@@ -2619,7 +2607,7 @@ static int Touchmcu_cfg_update(struct i2c_hid *ihid, const unsigned char *fw_dat
 	temp_buf[2] = 0x80;
 	ret = Touchmcu_write_cmd(ihid, CMD_ADDR,temp_buf, 3) ;
 	if (ret < 0) {
-		i2c_hid_err(ihid, "Failed write send cfg cmd\n");
+		i2c_hid_err(ihid, "%s Failed write send cfg cmd\n", __func__);
 		return ret;
 	}
 
@@ -2628,7 +2616,7 @@ static int Touchmcu_cfg_update(struct i2c_hid *ihid, const unsigned char *fw_dat
 	retry = GDIX_RETRY_TIMES;
 	do {
 		ret = Touchmcu_read(ihid, CMD_ADDR, temp_buf, 1);
-		i2c_hid_err(ihid, "Wait CMD_ADDR == 0x82...\n");
+		i2c_hid_err(ihid, "%s Wait CMD_ADDR == 0x82...\n", __func__);
 		if (ret < 0) {
 			i2c_hid_err(ihid, "Failed read 0x%x, ret = %d, kb_connected = %d\n",
 				CMD_ADDR, ret, kb_connected);
@@ -2637,20 +2625,20 @@ static int Touchmcu_cfg_update(struct i2c_hid *ihid, const unsigned char *fw_dat
 		}
 		if (temp_buf[0] == 0x82)
 			break;
-		i2c_hid_err(ihid, "0x%x value is 0x%x != 0x82, retry\n", CMD_ADDR, temp_buf[0]);
+		i2c_hid_err(ihid, "%s 0x%x value is 0x%x != 0x82, retry\n", __func__, CMD_ADDR, temp_buf[0]);
 		msleep(30);
 	} while (--retry);
 
 	if (!retry) {
-		i2c_hid_err(ihid, "Reg 0x%x != 0x82\n", CMD_ADDR);
+		i2c_hid_err(ihid, "%s Reg 0x%x != 0x82\n", __func__, CMD_ADDR);
 		return -2;
 	}
-	i2c_hid_err(ihid, "Wait CMD_ADDR == 0x82 success.\n");
+	i2c_hid_err(ihid, "%s Wait CMD_ADDR == 0x82 success.\n", __func__);
 
 	/* Start load config */
 	ret = Touchmcu_write_cmd(ihid, CFG_START_ADDR, &fw_data[cfg_offset],sub_cfg_len) ;
 	if (ret < 0) {
-		i2c_hid_err(ihid, "Failed write cfg to xdata, ret=%d\n", ret);
+		i2c_hid_err(ihid, "%s Failed write cfg to xdata, ret=%d\n", __func__, ret);
 		return ret;
 	}
 	msleep(100);
@@ -2659,7 +2647,7 @@ static int Touchmcu_cfg_update(struct i2c_hid *ihid, const unsigned char *fw_dat
 	temp_buf[0] = 0x83;
 	ret = Touchmcu_write_cmd(ihid, CMD_ADDR,temp_buf, 1) ;
 	if (ret < 0) {
-		i2c_hid_err(ihid, "Failed write send cfg finish cmd\n");
+		i2c_hid_err(ihid, "%s Failed write send cfg finish cmd\n", __func__);
 		return ret;
 	}
 
@@ -2668,29 +2656,29 @@ static int Touchmcu_cfg_update(struct i2c_hid *ihid, const unsigned char *fw_dat
 	retry = GDIX_RETRY_TIMES;
 	do {
 		ret = Touchmcu_read(ihid, CMD_ADDR, temp_buf, 1);
-		i2c_hid_err(ihid, "Wait CMD_ADDR == 0xFF...\n");
+		i2c_hid_err(ihid, "%s Wait CMD_ADDR == 0xFF...\n", __func__);
 		if (ret < 0) {
-			i2c_hid_err(ihid, "Failed read 0x%x, ret = %d, kb_connected = %d\n",
-				CMD_ADDR, ret, kb_connected);
+			i2c_hid_err(ihid, "%s Failed read 0x%x, ret = %d, kb_connected = %d\n",
+				__func__, CMD_ADDR, ret, kb_connected);
 			if(kb_connected == false)
 				return ret;
 		}
 		if (temp_buf[0] == 0xff)
 			break;
-		i2c_hid_err(ihid, "0x%x value is 0x%x != 0xFF, retry\n", CMD_ADDR, temp_buf[0]);
+		i2c_hid_err(ihid, "%s 0x%x value is 0x%x != 0xFF, retry\n", __func__, CMD_ADDR, temp_buf[0]);
 		msleep(30);
 	} while (--retry);
 
 	if (!retry) {
-		i2c_hid_err(ihid, "Reg 0x%x != 0xFF\n", CMD_ADDR);
+		i2c_hid_err(ihid, "%s Reg 0x%x != 0xFF\n", __func__, CMD_ADDR);
 		return ret < 0 ? ret : -EIO;
 	}
-	i2c_hid_err(ihid, "Wait CMD_ADDR == 0xFF success.\n");
+	i2c_hid_err(ihid, "%s Wait CMD_ADDR == 0xFF success.\n", __func__);
 
 	//before update config,read curr config version
 	Touchmcu_read(ihid, CFG_START_ADDR,cfg_ver_after,3);
-	i2c_hid_err(ihid, "After update,cfg version is 0x%02x 0x%02x 0x%02x\n",
-		cfg_ver_after[0],cfg_ver_after[1],cfg_ver_after[2]);
+	i2c_hid_err(ihid, "%s After update,cfg version is 0x%02x 0x%02x 0x%02x\n",
+		__func__, cfg_ver_after[0],cfg_ver_after[1],cfg_ver_after[2]);
 
 	return 0;
 }
@@ -2705,68 +2693,68 @@ static int padmcu_fw_update(struct i2c_hid *ihid, const unsigned char *fw_data, 
 		if(i > 0) {
 			msleep(300);
 		}
-		i2c_hid_err(ihid, "retry num =%d\n", i);
+		i2c_hid_err(ihid, "%s retry num =%d\n", __func__, i);
 		/*enter update mode*/
 		ret = padmcu_enter_fw_mode(ihid);
 		if(ret) {
-			i2c_hid_err(ihid, "enter fw mode fail\n");
+			i2c_hid_err(ihid, "%s enter fw mode fail\n", __func__);
 			continue;
 		} else {
-			i2c_hid_err(ihid, "enter fw mode success\n");
+			i2c_hid_err(ihid, "%s enter fw mode success\n", __func__);
 		}
 
 		/* clear update area*/
 		ret = padmcu_clear_fw_area(ihid, count);
 		if(ret) {
-			i2c_hid_err(ihid, "clear fw area fail\n");
+			i2c_hid_err(ihid, "%s clear fw area fail\n", __func__);
 			continue;
 		} else {
-			i2c_hid_err(ihid, "clear fw area success\n");
+			i2c_hid_err(ihid, "%s clear fw area success\n", __func__);
 		}
 
 		/* write update area*/
 		ret = padmcu_write_fw_area(ihid, count);
 		if(ret) {
-			i2c_hid_err(ihid, "write update area fail\n");
+			i2c_hid_err(ihid, "%s write update area fail\n", __func__);
 			continue;
 		} else {
-			i2c_hid_err(ihid, "write update area success\n");
+			i2c_hid_err(ihid, "%s write update area success\n", __func__);
 		}
 
 		/* write update data*/
 		ret = padmcu_write_fw_update(ihid, fw_data, count);
 		if(ret) {
-			i2c_hid_err(ihid, "write update fw fail\n");
+			i2c_hid_err(ihid, "%s write update fw fail\n", __func__);
 			continue;
 		} else {
-			i2c_hid_err(ihid, "write update fw success\n");
+			i2c_hid_err(ihid, "%s write update fw success\n", __func__);
 		}
 
 
 		/*start check fw update*/
 		ret = padmcu_check_fw_area(ihid, count);
 		if(ret) {
-			i2c_hid_err(ihid, "start check fw update fail\n");
+			i2c_hid_err(ihid, "%s start check fw update fail\n", __func__);
 			continue;
 		} else {
-			i2c_hid_err(ihid, "start check fw update success\n");
+			i2c_hid_err(ihid, "%s start check fw update success\n", __func__);
 		}
 
 		/*check fw update*/
 		ret = padmcu_write_fw_update(ihid, fw_data, count);
 		if(ret) {
-			i2c_hid_err(ihid, "check fw update fail\n");
+			i2c_hid_err(ihid, "%s check fw update fail\n", __func__);
 			continue;
 		} else {
-			i2c_hid_err(ihid, "check fw update success\n");
+			i2c_hid_err(ihid, "%s check fw update success\n", __func__);
 		}
 
 		/*reset mcu*/
 		ret = padmcu_reset_mcu(ihid);
 		if(ret) {
-			i2c_hid_err(ihid, "reset mcu fail\n");
+			i2c_hid_err(ihid, "%s reset mcu fail\n", __func__);
 		} else {
-			i2c_hid_err(ihid, "reset mcu success\n");
+			i2c_hid_err(ihid, "%s reset mcu success\n", __func__);
 			break;
 		}
 	}
@@ -2774,9 +2762,9 @@ static int padmcu_fw_update(struct i2c_hid *ihid, const unsigned char *fw_data, 
 		msleep(1000);
 		ret = padmcu_read_panel_mcu_fw(ihid);
 		if(ret) {
-			i2c_hid_err(ihid, "reset mcu  version fail\n");
+			i2c_hid_err(ihid, "%s reset mcu  version fail\n", __func__);
 		} else {
-			i2c_hid_err(ihid, "reset mcu  version success\n");
+			i2c_hid_err(ihid, "%s reset mcu  version success\n", __func__);
 		}
 	}
 	return ret;
@@ -2791,7 +2779,7 @@ static int kpdmcu_fw_update(struct i2c_hid *ihid, const unsigned char *fw_data, 
 	for (i=0; i < retry; i++)
 	{
 		if(kb_connected == false) {
-			i2c_hid_err(ihid, "kpdmcu_fw_update fail, ret = %d\n", ret);
+			i2c_hid_err(ihid, "%s kpdmcu_fw_update fail, ret = %d\n", __func__, ret);
 			return ret < 0 ? ret : -EIO;
 		}
 
@@ -2802,28 +2790,28 @@ static int kpdmcu_fw_update(struct i2c_hid *ihid, const unsigned char *fw_data, 
 		/*enter update mode*/
 		ret = kpdmcu_enter_fw_mode(ihid);
 		if(ret) {
-			i2c_hid_err(ihid, "enter fw mode fail\n");
+			i2c_hid_err(ihid, "%s enter fw mode fail\n", __func__);
 			continue;
 		} else {
-			i2c_hid_err(ihid, "enter fw mode success\n");
+			i2c_hid_err(ihid, "%s enter fw mode success\n", __func__);
 		}
 
 		/* clear update area*/
 		ret = kpdmcu_clear_fw_area(ihid, count);
 		if(ret) {
-			i2c_hid_err(ihid, "clear fw area fail\n");
+			i2c_hid_err(ihid, "%s clear fw area fail\n", __func__);
 			continue;
 		} else {
-			i2c_hid_err(ihid, "clear fw area success\n");
+			i2c_hid_err(ihid, "%s clear fw area success\n", __func__);
 		}
 
 		/* write update area*/
 		ret = kpdmcu_write_fw_area(ihid, count);
 		if(ret) {
-			i2c_hid_err(ihid, "write update area fail\n");
+			i2c_hid_err(ihid, "%s write update area fail\n", __func__);
 			continue;
 		} else {
-			i2c_hid_err(ihid, "write update area success\n");
+			i2c_hid_err(ihid, "%s write update area success\n", __func__);
 		}
 
 		ihid->fw_update_progress  = FW_PROGRESS_3 * FW_PERCENTAGE_100;
@@ -2831,36 +2819,36 @@ static int kpdmcu_fw_update(struct i2c_hid *ihid, const unsigned char *fw_data, 
 		/* write update data*/
 		ret = kpdmcu_write_fw_update(ihid, fw_data, count);
 		if(ret) {
-			i2c_hid_err(ihid, "write update fw fail\n");
+			i2c_hid_err(ihid, "%s write update fw fail\n", __func__);
 			continue;
 		} else {
-			i2c_hid_err(ihid, "write update fw success\n");
+			i2c_hid_err(ihid, "%s write update fw success\n", __func__);
 		}
 
 		/*start check fw update*/
 		ret = kpdmcu_check_fw_area(ihid, count);
 		if(ret) {
-			i2c_hid_err(ihid, "start check fw update fail\n");
+			i2c_hid_err(ihid, "%s start check fw update fail\n", __func__);
 			continue;
 		} else {
-			i2c_hid_err(ihid, "start check fw update success\n");
+			i2c_hid_err(ihid, "%s start check fw update success\n", __func__);
 		}
 
 		/*check fw update*/
 		ret = kpdmcu_write_fw_update(ihid, fw_data, count);
 		if(ret) {
-			i2c_hid_err(ihid, "check fw update fail\n");
+			i2c_hid_err(ihid, "%s check fw update fail\n", __func__);
 			continue;
 		} else {
-			i2c_hid_err(ihid, "check fw update success\n");
+			i2c_hid_err(ihid, "%s check fw update success\n", __func__);
 		}
 
 		/*reset mcu*/
 		ret = kpdmcu_reset_mcu(ihid);
 		if(ret) {
-			i2c_hid_err(ihid, "reset mcu fail\n");
+			i2c_hid_err(ihid, "%s reset mcu fail\n", __func__);
 		} else {
-			i2c_hid_err(ihid, "reset mcu success\n");
+			i2c_hid_err(ihid, "%s reset mcu success\n", __func__);
 			msleep(1000);
 			ihid->is_kpdmcu_need_fw_update = Check_kpdmcu_fw_update(ihid);
 			break;
@@ -2883,14 +2871,14 @@ static int touchmcu_fw_update(struct i2c_hid *ihid, const unsigned char *fw_data
 		do {
 			ret = _touchmcu_fw_update(ihid, fw_data, count, flag, is_flash_cfg_isp);
 			if (ret) {
-				i2c_hid_err(ihid,"touch Update failed, retry %d, kb_connected %d\n",
-					retry, kb_connected);
+				i2c_hid_err(ihid,"%s touch Update failed, retry %d, kb_connected %d\n",
+					__func__, retry, kb_connected);
 				if(kb_connected == false)
 					return ret;
 				msleep(200);
 			} else {
 				msleep(300);
-				i2c_hid_err(ihid,"touch Update FW success\n");
+				i2c_hid_err(ihid,"%s touch Update FW success\n", __func__);
 				if(is_flash_cfg_isp || !(flag & NEED_UPDATE_CONFIG))
 					ihid->kpd_fw_status = FW_UPDATE_SUC;
 				break;
@@ -2904,26 +2892,26 @@ static int touchmcu_fw_update(struct i2c_hid *ihid, const unsigned char *fw_data
 	if(is_flash_cfg_isp || !(flag & NEED_UPDATE_CONFIG))
 		return ret;
 
-	i2c_hid_err(ihid, "Update config interactively");
+	i2c_hid_err(ihid, "%s Update config interactively", __func__);
 	retry = 0;
 	do {
 		ret = Touchmcu_cfg_update(ihid, fw_data, count);
 		if (!ret) {
-			i2c_hid_err(ihid, "Update cfg success\n");
+			i2c_hid_err(ihid, "%s Update cfg success\n", __func__);
 			msleep(300);
 			return ret;
 		} else {
 			if(kb_connected == false) {
-				i2c_hid_err(ihid,"Update cfg failed, kb_connected %d\n", kb_connected);
+				i2c_hid_err(ihid,"%s Update cfg failed, kb_connected %d\n", __func__, kb_connected);
 				return ret;
 			}
 		}
 		if (ret == CFG_NOT_MATCH) {
-			i2c_hid_err(ihid, "No valid cfg data found for update\n");
+			i2c_hid_err(ihid, "%s No valid cfg data found for update\n", __func__);
 		}
 	} while (retry++ < 3);
 
-	i2c_hid_err(ihid, "config update err:ret=%d\n", ret);
+	i2c_hid_err(ihid, "%s config update err:ret=%d\n", __func__, ret);
 	return ret;
 }
 
@@ -2940,7 +2928,7 @@ static int upload_pogopin_kevent_data(struct i2c_hid *ihid, unsigned char *paylo
 				sizeof(char) * POGOPIN_TRIGGER_MSG_LEN, GFP_KERNEL);
 
 	if (!user_msg_info) {
-		i2c_hid_err(ihid, "%s: Allocation failed\n");
+		i2c_hid_err(ihid, "%s: Allocation failed\n", __func__);
 		return -ENOMEM;
 	}
 
@@ -3024,8 +3012,8 @@ static void kpdmcu_fw_mcu_version_thread(struct work_struct *work)
 	mutex_lock(&ihid->fw_lock);
 	fw_ihid->kpd_fw_status = FW_UPDATE_READY;
 	fw_ihid->fw_update_progress = 0;
-	fw_ihid->is_kpdmcu_need_fw_update = Check_kpdmcu_fw_update(fw_ihid);
 	fw_ihid->is_touchmcu_need_fw_update = Check_touchmcu_fw_update(fw_ihid);
+	fw_ihid->is_kpdmcu_need_fw_update = Check_kpdmcu_fw_update(fw_ihid);
 	ret = kpdmcu_sn_feedback(ihid);
 	mutex_unlock(&ihid->fw_lock);
 	if(ret)
@@ -3041,7 +3029,7 @@ static void kpdmcu_fw_data_version_thread(struct work_struct *work)
 	int i = 0;
 
 	if(fw_ihid == NULL) {
-		i2c_hid_err(ihid, "fw_ihid is NULL\n");
+		i2c_hid_err(ihid, "%s fw_ihid is NULL\n", __func__);
 		return;
 	}
 
@@ -3055,7 +3043,7 @@ static void kpdmcu_fw_data_version_thread(struct work_struct *work)
 			ihid->kpdmcu_fw_count[i] = (u32)(fw_entry->size / 1024);
 			ihid->kpdmcu_fw_data_version[i] = (int)fw_entry->data[35];
 		} else {
-			i2c_hid_err(ihid, "kpd mcu request firmware fail\n");
+			i2c_hid_err(ihid, "%s kpd mcu request firmware fail\n", __func__);
 			continue;
 		}
 
@@ -3073,24 +3061,24 @@ static void kpdmcu_fw_data_version_thread(struct work_struct *work)
 		fw_ihid->touchfw_cid_version_minor = (int)((fw_entry->data[GTX8_FW_IMAGE_VID_OFFSET + 1] << 8) |
 								    fw_entry->data[GTX8_FW_IMAGE_VID_OFFSET + 2]);
 	} else {
-		i2c_hid_err(ihid, "kpd mcu request firmware fail\n");
+		i2c_hid_err(ihid, "%s kpd mcu request firmware fail\n", __func__);
 		return;
 	}
 
 	release_firmware(fw_entry);
 	fw_entry = NULL;
 
-	mutex_lock(&ihid->fw_lock);
+	mutex_lock(&fw_ihid->fw_lock);
 	if(kb_connected) {
                 if(fw_ihid->is_oneplus_keyboard_or_not)
                         fw_ihid->kpdmcu_fw_data_ver = ihid->kpdmcu_fw_data_version[1];
                 else
                         fw_ihid->kpdmcu_fw_data_ver = ihid->kpdmcu_fw_data_version[0];
 		fw_ihid->kpd_fw_status = FW_UPDATE_READY;
-		fw_ihid->is_kpdmcu_need_fw_update = Check_kpdmcu_fw_update(fw_ihid);
 		fw_ihid->is_touchmcu_need_fw_update = Check_touchmcu_fw_update(fw_ihid);
+		fw_ihid->is_kpdmcu_need_fw_update = Check_kpdmcu_fw_update(fw_ihid);
 	}
-	mutex_unlock(&ihid->fw_lock);
+	mutex_unlock(&fw_ihid->fw_lock);
 }
 
 static void kpdmcu_fw_update_thread(struct work_struct *work)
@@ -3129,7 +3117,7 @@ static void kpdmcu_fw_update_thread(struct work_struct *work)
 	ihid->fw_update_progress = FW_PROGERSS_1 * FW_PERCENTAGE_100;
 
 	if(ihid->is_kpdmcu_need_fw_update == false && ihid->kpdmcu_fw_update_force == false) {
-		i2c_hid_err(ihid, "not need fw update kpdmcu\n");
+		i2c_hid_err(ihid, "%s not need fw update kpdmcu\n", __func__);
 	} else {
 		if(ihid->is_oneplus_keyboard_or_not)
 			kpdmcu_fw_entry = get_fw_firmware(ihid, keyboard_fw_ihid->keyboard_firmware_name[1]);
@@ -3138,9 +3126,9 @@ static void kpdmcu_fw_update_thread(struct work_struct *work)
 		if(kpdmcu_fw_entry != NULL) {
 			kpdmcu_fw_data_count = (u32)kpdmcu_fw_entry->size;
 			kpdmcu_firmware_data = kpdmcu_fw_entry->data;
-			i2c_hid_err(ihid, " kpd_mcu fw count 0X%x\n", kpdmcu_fw_data_count);
+			i2c_hid_err(ihid, "%s kpd_mcu fw count 0X%x\n", __func__, kpdmcu_fw_data_count);
 		} else {
-			i2c_hid_err(ihid, "kpd fw request firmware fail\n");
+			i2c_hid_err(ihid, "%s kpd fw request firmware fail\n", __func__);
 			ihid->kpd_fw_status = FW_UPDATE_FAIL;
 			goto out3;
 		}
@@ -3157,7 +3145,7 @@ static void kpdmcu_fw_update_thread(struct work_struct *work)
 	}
 
 	if(ihid->is_touchmcu_need_fw_update == false && ihid->kpdmcu_fw_update_force == false) {
-		i2c_hid_err(ihid, "not need fw update touch mcu\n");
+		i2c_hid_err(ihid, "%s not need fw update touch mcu\n", __func__);
 		ihid->kpd_fw_status = FW_UPDATE_SUC;
 		ihid->fw_update_progress = FW_PROGRESS_100 * FW_PERCENTAGE_100;
 		goto out2;
@@ -3170,16 +3158,16 @@ static void kpdmcu_fw_update_thread(struct work_struct *work)
 		touchmcu_fw_data_count = (u32)(touchmcu_firmware_data[0] << 24 | touchmcu_firmware_data[1] << 16 | touchmcu_firmware_data[2] << 8 | touchmcu_firmware_data[3]);
 		touchmcu_cfg_data_count = (u32)((touchmcu_firmware_data[touchmcu_fw_data_count+6]<<8)+touchmcu_firmware_data[touchmcu_fw_data_count+7]);
 		if(touchmcu_total_data_count-touchmcu_fw_data_count-6 != touchmcu_cfg_data_count+6) {
-			i2c_hid_err(ihid, " error touch_fw count total:0X%x, fw_count:0X%x, cfg_count:0X%x\n",
-						    touchmcu_total_data_count, touchmcu_fw_data_count, touchmcu_cfg_data_count);
+			i2c_hid_err(ihid, "%s error touch_fw count total:0X%x, fw_count:0X%x, cfg_count:0X%x\n",
+						    __func__, touchmcu_total_data_count, touchmcu_fw_data_count, touchmcu_cfg_data_count);
 			ihid->kpd_fw_status = FW_UPDATE_FAIL;
 			goto out1;
 		} else {
-			i2c_hid_err(ihid, " touch_fw count total:0X%x, fw_count:0X%x, cfg_count:0X%x\n",
-						    touchmcu_total_data_count, touchmcu_fw_data_count, touchmcu_cfg_data_count);
+			i2c_hid_err(ihid, "&s touch_fw count total:0X%x, fw_count:0X%x, cfg_count:0X%x\n",
+						    __func__, touchmcu_total_data_count, touchmcu_fw_data_count, touchmcu_cfg_data_count);
 		}
 	} else {
-			i2c_hid_err(ihid, "touch fw request firmware fail\n");
+			i2c_hid_err(ihid, "%s touch fw request firmware fail\n", __func__);
 			ihid->kpd_fw_status = FW_UPDATE_FAIL;
 			goto out2;
 	}
@@ -3188,7 +3176,7 @@ static void kpdmcu_fw_update_thread(struct work_struct *work)
 		ret = touchmcu_fw_update(ihid, touchmcu_firmware_data, touchmcu_fw_data_count);
 		ihid->is_touchmcu_need_fw_update = Check_touchmcu_fw_update(ihid);
 		if(ret || ihid->is_touchmcu_need_fw_update) {
-			i2c_hid_err(ihid, "touch fw update fail, retry is %d\n", retry);
+			i2c_hid_err(ihid, "%s touch fw update fail, retry is %d\n", __func__, retry);
 			if(retry >= 3)
 				ihid->kpd_fw_status = FW_UPDATE_FAIL;
 		} else {
@@ -3239,9 +3227,9 @@ static void padmcu_fw_update_thread(struct work_struct *work)
 		fw_data_count = (u32)fw_entry->size;
 		firmware_data = fw_entry->data;
 		ihid->padmcu_fw_data_version = (int)fw_entry->data[35];
-		i2c_hid_err(ihid, " pd_mcu count 0X%x, version is 0X%x\n", fw_data_count, ihid->padmcu_fw_data_version);
+		i2c_hid_err(ihid, "%s pd_mcu count 0X%x, version is 0X%x\n", __func__, fw_data_count, ihid->padmcu_fw_data_version);
 	} else {
-		i2c_hid_err(ihid, "padmcu request firmware fail\n");
+		i2c_hid_err(ihid, "%s padmcu request firmware fail\n", __func__);
 		return;
 	}
 
@@ -3254,9 +3242,9 @@ static void padmcu_fw_update_thread(struct work_struct *work)
 	if((ihid->padmcu_fw_data_version != ihid->padmcu_fw_mcu_version) || ihid->padmcu_fw_update_force) {
 		ret = padmcu_fw_update(ihid, firmware_data, fw_data_count);
 		if(ret) {
-			i2c_hid_err(ihid, "update pad_mcu fw fail!\n");
+			i2c_hid_err(ihid, "%s update pad_mcu fw fail!\n", __func__);
 		} else {
-			i2c_hid_err(ihid, "update pad_mcu fw success!\n");
+			i2c_hid_err(ihid, "%s update pad_mcu fw success!\n", __func__);
 		}
 	}
 
@@ -3564,6 +3552,10 @@ static int i2c_hid_resume(struct device *dev)
 	}
 
 	enable_irq(client->irq);
+
+	/* wait for hid irq handle completed */
+	msleep(1);
+	synchronize_irq(client->irq);
 
 	/* Instead of resetting device, simply powers the device on. This
 	 * solves "incomplete reports" on Raydium devices 2386:3118 and

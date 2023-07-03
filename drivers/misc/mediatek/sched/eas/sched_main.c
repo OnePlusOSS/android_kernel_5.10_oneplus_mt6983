@@ -120,7 +120,10 @@ static void sched_queue_task_hook(void *data, struct rq *rq, struct task_struct 
 #endif
 
 #if IS_ENABLED(CONFIG_OPLUS_FEATURE_SCHED_ASSIST)
-	queue_ux_thread(rq, p, (type == enqueue));
+	if (type == enqueue)
+		android_rvh_enqueue_task_handler(data, rq, p, flags);
+	else
+		android_rvh_dequeue_task_handler(data, rq, p, flags);
 #endif
 }
 

@@ -121,6 +121,7 @@ bool oplus_ofp_backlight_filter(int bl_level);
 /* -------------------- aod -------------------- */
 int oplus_ofp_aod_off_status_handle(void *mtk_drm_crtc);
 int oplus_ofp_doze_status_handle(bool doze_enable, void *drm_crtc, void *mtk_panel_ext, void *drm_panel, void *mtk_dsi, void *dcs_write_gce);
+int oplus_ofp_set_aod_light_mode_after_doze_enable(void *mtk_panel_ext, void *mtk_dsi, void *dcs_write_gce);
 void oplus_ofp_aod_off_set_work_handler(struct work_struct *work_item);
 int oplus_ofp_touchpanel_event_notifier_call(struct notifier_block *nb, unsigned long action, void *data);
 int oplus_ofp_aod_off_hbm_on_delay_check(void *mtk_drm_crtc);
@@ -146,12 +147,12 @@ ssize_t oplus_ofp_set_hbm_attr(struct kobject *obj,
 	struct kobj_attribute *attr, const char *buf, size_t count);
 
 /* aod part */
-int oplus_ofp_get_aod_light_mode(void *buf);
 int oplus_ofp_set_aod_light_mode(void *buf);
-ssize_t oplus_ofp_get_aod_light_mode_attr(struct kobject *obj,
-	struct kobj_attribute *attr, char *buf);
+int oplus_ofp_get_aod_light_mode(void *buf);
 ssize_t oplus_ofp_set_aod_light_mode_attr(struct kobject *obj,
 	struct kobj_attribute *attr, const char *buf, size_t count);
+ssize_t oplus_ofp_get_aod_light_mode_attr(struct kobject *obj,
+	struct kobj_attribute *attr, char *buf);
 
 #endif /*_OPLUS_DISPLAY_ONSCREENFINGERPRINT_H_*/
 

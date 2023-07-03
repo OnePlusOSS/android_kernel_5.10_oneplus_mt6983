@@ -88,7 +88,7 @@
 #define DEFAULT_GCC_ENQ_BOUND_QUOTA 6
 #define DEFAULT_GCC_DEQ_BOUND_THRS 20
 #define DEFAULT_GCC_DEQ_BOUND_QUOTA 6
-#define DEFAULT_BLC_BOOST 100
+#define DEFAULT_BLC_BOOST 0
 
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
@@ -261,6 +261,7 @@ static int aa_retarget;
 static int sbe_rescue_enable;
 static int loading_ignore_enable;
 static int variance_control_enable;
+static int loading_enable;
 
 module_param(bhr, int, 0644);
 module_param(bhr_opp, int, 0644);
@@ -333,6 +334,7 @@ module_param(boost_LR, int, 0644);
 module_param(aa_retarget, int, 0644);
 module_param(loading_ignore_enable, int, 0644);
 module_param(variance_control_enable, int, 0644);
+module_param(loading_enable, int, 0644);
 
 static DEFINE_SPINLOCK(freq_slock);
 static DEFINE_MUTEX(fbt_mlock);
@@ -1599,7 +1601,7 @@ static void fbt_set_min_cap_locked(struct render_info *thr, int min_cap,
 	kfree(clus_floor_freq);
 	kfree(clus_opp);
 
-	if (loading_th || boost_affinity || boost_LR)
+	if (loading_th || boost_affinity || boost_LR || loading_enable)
 		fbt_query_dep_list_loading(thr);
 
 	if (boost_affinity || boost_LR)
@@ -3408,12 +3410,6 @@ int fbt_get_max_dep_pct(struct render_info *thread_info)
 	return pct;
 }
 
-static void fbt_blc_boost(unsigned int *blc)
-{
-	*blc = *blc * blc_boost;
-	do_div(*blc, 100);
-	*blc = clamp((int)*blc, 1, 100);
-}
 
 static int fbt_boost_policy(
 	long long t_cpu_cur,
@@ -3548,9 +3544,11 @@ static int fbt_boost_policy(
 
 	}
 
-	fpsgo_systrace_c_fbt(pid, buffer_id, blc_wt, "before boost");
-	fpsgo_systrace_c_fbt(pid, buffer_id, blc_boost, "blc_boost");
-	fbt_blc_boost(&blc_wt);
+	if (blc_boost) {
+		fpsgo_systrace_c_fbt(pid, buffer_id, blc_wt, "before boost");
+		fpsgo_systrace_c_fbt(pid, buffer_id, blc_boost, "blc_boost");
+		blc_wt = blc_wt * blc_boost / 100;
+	}
 
 	if (boost_info->sbe_rescue == 0) {
 		fbt_set_limit(pid, blc_wt, pid, buffer_id,
@@ -3568,6 +3566,7 @@ static int fbt_boost_policy(
 
 	fbt_set_limit(pid, blc_wt, pid, buffer_id,
 		thread_info->dep_valid_size, thread_info->dep_arr, thread_info, t_cpu_cur);
+
 
 	if (!boost_ta)
 		fbt_set_min_cap_locked(thread_info, blc_wt, FPSGO_JERK_INACTIVE);
@@ -4201,6 +4200,8 @@ static void fbt_frame_start(struct render_info *thr, unsigned long long ts)
 	loading = fbt_get_loading(thr, ts);
 	fpsgo_systrace_c_fbt_debug(thr->pid, thr->buffer_id,
 		loading, "compute_loading");
+
+	thr->avg_freq = loading / nsec_to_100usec(thr->Q2Q_time);
 
 	/* unreliable targetfps */
 	if (targetfps == -1) {

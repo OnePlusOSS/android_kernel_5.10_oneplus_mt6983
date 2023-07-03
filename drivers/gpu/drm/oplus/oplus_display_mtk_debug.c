@@ -21,6 +21,10 @@ extern int mtk_cmdq_msg;
 
 extern void drm_invoke_fps_chg_callbacks(unsigned int new_fps);
 extern void set_logger_enable(int enable);
+#ifdef OPLUS_FEATURE_DISPLAY
+extern void pq_dump_all(unsigned int dump_flag);
+#endif
+static bool g_mobile_log_default_state = false;
 
 /* log level config */
 int oplus_disp_drv_log_level = OPLUS_DISP_DRV_LOG_LEVEL_INFO; /*After STR5 should set OPLUS_DISP_DRV_LOG_LEVEL_INFO*/
@@ -51,6 +55,20 @@ int oplus_display_set_mtk_loglevel(void *buf)
 			g_irq_log = true;
 		if ((loglevel & MTK_LOG_LEVEL_TRACE_LOG) == MTK_LOG_LEVEL_TRACE_LOG)
 			g_trace_log = true;
+		if ((loglevel & MTK_LOG_LEVEL_DUMP_REGS) == MTK_LOG_LEVEL_DUMP_REGS) {
+			if (!g_mobile_log) {
+				g_mobile_log = true;
+				g_mobile_log_default_state = false;
+			} else {
+				g_mobile_log_default_state = true;
+			}
+#ifdef OPLUS_FEATURE_DISPLAY
+			pq_dump_all(0xFF);
+#endif
+			if (!g_mobile_log_default_state) {
+				g_mobile_log = false;
+			}
+		}
 	} else {
 		if ((loglevel & MTK_LOG_LEVEL_MOBILE_LOG) == MTK_LOG_LEVEL_MOBILE_LOG) {
 			g_mobile_log = false;
@@ -65,6 +83,11 @@ int oplus_display_set_mtk_loglevel(void *buf)
 			g_irq_log = false;
 		if ((loglevel & MTK_LOG_LEVEL_TRACE_LOG) == MTK_LOG_LEVEL_TRACE_LOG)
 			g_trace_log = false;
+		if ((loglevel & MTK_LOG_LEVEL_DUMP_REGS) == MTK_LOG_LEVEL_DUMP_REGS) {
+			if (!g_mobile_log_default_state) {
+				g_mobile_log = false;
+			}
+		}
 	}
 
 	return 0;

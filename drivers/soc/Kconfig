@@ -60,6 +60,10 @@ source "kernel/oplus_cpu/oplus_omrg/Kconfig"
 source "kernel/oplus_cpu/cpufreq_bouncing/Kconfig"
 #endif /* OPLUS_FEATURE_GKI_CPUFREQ_BOUNCING */
 
+#ifdef OPLUS_FEATURE_ABNORMAL_FLAG
+source "kernel/oplus_cpu/oplus_overload/Kconfig"
+#endif /* OPLUS_FEATURE_ABNORMAL_FLAG*/
+
 #ifdef OPLUS_FEATURE_MM_FEEDBACK
 source "drivers/soc/oplus/oplus_mm_fb/Kconfig"
 #endif /* OPLUS_FEATURE_MM_FEEDBACK */

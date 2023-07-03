@@ -1303,6 +1303,7 @@ void oplus_adfr_dsi_display_auto_mode_update(struct drm_device *drm)
 	struct drm_crtc *crtc;
 	struct mtk_drm_private *private = NULL;
 	int h_skew = SDC_ADFR;
+	static int old_h_skew = SDC_ADFR;
 	int rc = 0;
 
 	if (!oplus_adfr_is_support()) {
@@ -1324,6 +1325,8 @@ void oplus_adfr_dsi_display_auto_mode_update(struct drm_device *drm)
 
 	mtk_drm_trace_begin("dsi_display_auto_mode_update");
 
+	if ((h_skew == OPLUS_ADFR) && (old_h_skew != OPLUS_ADFR))
+		oplus_adfr_auto_min_fps = 0;
 	if (h_skew == OPLUS_ADFR) {
 		static u32 minfps = 0;
 		mutex_lock(&multite_mutex);
@@ -1380,6 +1383,7 @@ void oplus_adfr_dsi_display_auto_mode_update(struct drm_device *drm)
 		oplus_adfr_auto_fakeframe_updated = false;
 	}
 
+	old_h_skew = h_skew;
 	mtk_drm_trace_end();
 	return;
 }

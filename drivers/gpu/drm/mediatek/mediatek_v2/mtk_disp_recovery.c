@@ -76,7 +76,10 @@ long _set_state(struct drm_crtc *crtc, const char *name)
 	}
 
 	/* select state! */
-	pinctrl_select_state(priv->pctrl, pState);
+	DDPMSG("%s %s\n", __func__, name);
+	ret = pinctrl_select_state(priv->pctrl, pState);
+	if (ret)
+		DDPPR_ERR("%s set %s fail:%d\n", __func__, name, ret);
 
 exit:
 	mutex_unlock(&pinctrl_lock);
@@ -886,6 +889,12 @@ static int mtk_drm_esd_check_worker_kthread(void *data)
 				"[ESD%u]esd recover %d times failed, max:%d, disable esd check, ret:%d\n",
 				crtc_idx, i, ESD_TRY_CNT, ret);
 			mtk_disp_esd_check_switch(crtc, false);
+			/*
+			 * disable ESD check might release TE pin to GPIO mode when connector
+			 * switch enabled, need restore TE pin back to TE mode.
+			 */
+			if (esd_ctx->need_release_eint == 1)
+				mtk_drm_request_eint(crtc);
 			DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
 			mutex_unlock(&private->commit.lock);
 			break;
@@ -909,6 +918,7 @@ void mtk_disp_esd_check_switch(struct drm_crtc *crtc, bool enable)
 	struct mtk_drm_private *priv = crtc->dev->dev_private;
 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
 	struct mtk_drm_esd_ctx *esd_ctx = mtk_crtc->esd_ctx;
+	struct mtk_panel_ext *panel_ext;
 
 	if (!mtk_drm_helper_get_opt(priv->helper_opt,
 					   MTK_DRM_OPT_ESD_CHECK_RECOVERY))
@@ -919,6 +929,16 @@ void mtk_disp_esd_check_switch(struct drm_crtc *crtc, bool enable)
 			__func__, drm_crtc_index(crtc));
 		return;
 	}
+
+	panel_ext = mtk_crtc->panel_ext;
+	if (!(panel_ext && panel_ext->params)) {
+		DDPMSG("can't find panel_ext handle\n");
+		return;
+	}
+
+	if (0 == _lcm_need_esd_check(panel_ext))
+		return;
+
 	DDPINFO("%s %u, esd chk active: %d\n", __func__, drm_crtc_index(crtc), enable);
 	esd_ctx->chk_active = enable;
 

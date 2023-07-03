@@ -36,6 +36,9 @@
 
 #define AAL_EN BIT(0)
 static int g_dre30_support;
+#ifdef OPLUS_FEATURE_DISPLAY
+extern bool g_dmdp_probe_ready;
+#endif
 struct mtk_dmdp_aal_data {
 	bool support_shadow;
 	bool need_bypass_shadow;
@@ -50,6 +53,8 @@ struct mtk_dmdp_aal {
 
 static struct mtk_ddp_comp *default_comp;
 static struct mtk_ddp_comp *default_comp1;
+
+extern bool panel_is_aries(void);
 
 static inline struct mtk_dmdp_aal *comp_to_dmdp_aal(struct mtk_ddp_comp *comp)
 {
@@ -122,6 +127,12 @@ static void mtk_dmdp_aal_config(struct mtk_ddp_comp *comp,
 	else
 		cmdq_pkt_write(handle, comp->cmdq_base,
 			comp->regs_pa + DMDP_AAL_CFG, 0, 0x1);
+
+	if (panel_is_aries()) {
+		DDPINFO("%s: set DMDP_AAL_CFG\n", __func__);
+		cmdq_pkt_write(handle, comp->cmdq_base,
+			comp->regs_pa + DMDP_AAL_CFG, 1, 0x1);
+	}
 
 	cmdq_pkt_write(handle, comp->cmdq_base, comp->regs_pa + DMDP_AAL_SIZE,
 			val, ~0);
@@ -475,6 +486,9 @@ static int mtk_dmdp_aal_probe(struct platform_device *pdev)
 	if (!default_comp1 && comp_id == DDP_COMPONENT_DMDP_AAL1)
 		default_comp1 = &priv->ddp_comp;
 
+#ifdef OPLUS_FEATURE_DISPLAY
+	g_dmdp_probe_ready = true;
+#endif
 	return ret;
 }
 

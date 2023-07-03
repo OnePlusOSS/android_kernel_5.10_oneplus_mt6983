@@ -25,6 +25,9 @@ struct mt_led_data {
 	struct led_conf_info	conf;
 	int last_brightness;
 	int hw_brightness;
+	/*#ifdef OPLUS_FEATURE_DISPLAY*/
+	int repeat_count;
+	/*end*/
 	int last_hw_brightness;
 	struct led_debug_info debug;
 	int (*mtk_hw_brightness_set)(struct mt_led_data *m_data,

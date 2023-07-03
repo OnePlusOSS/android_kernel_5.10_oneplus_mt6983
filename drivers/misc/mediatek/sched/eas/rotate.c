@@ -24,6 +24,9 @@
 #if IS_ENABLED(CONFIG_OPLUS_FEATURE_FRAME_BOOST)
 #include <../kernel/oplus_cpu/sched/frame_boost/frame_group.h>
 #endif
+#if IS_ENABLED(CONFIG_OPLUS_FEATURE_ABNORMAL_FLAG)
+#include <../kernel/oplus_cpu/oplus_overload/task_overload.h>
+#endif
 
 DEFINE_PER_CPU(struct task_rotate_work, task_rotate_works);
 bool big_task_rotation_enable = true;
@@ -129,7 +132,9 @@ void task_rotate_init(void)
 			sched_min_cap_orig_cpu);
 	} else
 		pr_info("scheduler: can not find min_cap_orig_cpu\n");
-
+#if IS_ENABLED(CONFIG_OPLUS_FEATURE_ABNORMAL_FLAG)
+	walt_update_cluster_id(min_orig_cap, SCHED_CAPACITY_SCALE);
+#endif /* #OPLUS_FEATURE_ABNORMAL_FLAG */
 	/* init rotate work */
 	task_rotate_work_init();
 }

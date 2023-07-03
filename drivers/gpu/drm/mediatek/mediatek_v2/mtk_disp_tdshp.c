@@ -16,6 +16,9 @@ static DEFINE_SPINLOCK(g_tdshp_clock_lock);
 // It's a work around for no comp assigned in functions.
 static struct mtk_ddp_comp *default_comp;
 static struct mtk_ddp_comp *tdshp1_default_comp;
+#ifdef OPLUS_FEATURE_DISPLAY
+extern bool g_tdshp_probe_ready;
+#endif
 
 #define index_of_tdshp(module) ((module == DDP_COMPONENT_TDSHP0) ? 0 : 1)
 #define DISP_TDSHP_HW_ENGINE_NUM (2)
@@ -719,6 +722,9 @@ static int mtk_disp_tdshp_probe(struct platform_device *pdev)
 		dev_err(dev, "Failed to add component: %d\n", ret);
 		mtk_ddp_comp_pm_disable(&priv->ddp_comp);
 	}
+#ifdef OPLUS_FEATURE_DISPLAY
+	g_tdshp_probe_ready = true;
+#endif
 	pr_notice("%s-\n", __func__);
 
 	return ret;

@@ -2819,14 +2819,14 @@ int _btif_dump_memory(char *str, unsigned char *p_buf, unsigned int buf_len)
 {
 	unsigned int idx = 0;
 
-	pr_debug("%s:, length:%d\n", str, buf_len);
-	for (idx = 0; idx < buf_len;) {
-		pr_debug("%02x ", p_buf[idx]);
-		idx++;
-		if (idx % 8 == 0)
-			pr_debug("\n");
-	}
-	return 0;
+    pr_info("%s:, length:%d\n", str, buf_len);
+    for (idx = 0; idx < buf_len;) {
+        pr_info("%02x ", p_buf[idx]);
+        idx++;
+        if (idx % 8 == 0)
+            pr_info("\n");
+    }
+    return 0;
 }
 
 int btif_send_data(struct _mtk_btif_ *p_btif,

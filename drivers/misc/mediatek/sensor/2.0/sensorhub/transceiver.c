@@ -152,13 +152,15 @@ static bool transceiver_wakeup_check(uint8_t action, uint8_t sensor_type)
 			sensor_type == SENSOR_TYPE_ANSWER_CALL ||
 			sensor_type == SENSOR_TYPE_FLAT ||
 //#ifdef OPLUS_SENSOR_FEATURE add for oplus virtual sensor
+			sensor_type == SENSOR_TYPE_SENSOR_MONITOR ||
 			sensor_type == SENSOR_TYPE_LUX_AOD ||
 			sensor_type == SENSOR_TYPE_PICKUP_DETECT ||
 			sensor_type == SENSOR_TYPE_FP_DISPLAY ||
 			sensor_type == SENSOR_TYPE_PHONE_PROX ||
 			sensor_type == SENSOR_TYPE_GESTURE_PROX ||
 			sensor_type == SENSOR_TYPE_FOLD_STATE ||
-			sensor_type == SENSOR_TYPE_REAR_PROXIMITY))
+			sensor_type == SENSOR_TYPE_REAR_PROXIMITY ||
+			sensor_type == SENSOR_TYPE_AMBIENTE_PROX))
 //#endif
 		return true;
 

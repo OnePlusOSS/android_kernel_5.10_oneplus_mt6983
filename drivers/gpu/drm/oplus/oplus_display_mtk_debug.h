@@ -27,6 +27,7 @@ enum {
 	MTK_LOG_LEVEL_FENCE_LOG = 0x4,
 	MTK_LOG_LEVEL_IRQ_LOG = 0x8,
 	MTK_LOG_LEVEL_TRACE_LOG = 0x10,
+	MTK_LOG_LEVEL_DUMP_REGS = 0x20,
 };
 
 enum oplus_disp_drv_log_level {

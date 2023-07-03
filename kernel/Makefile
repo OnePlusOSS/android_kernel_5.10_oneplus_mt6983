@@ -150,6 +150,10 @@ obj-$(CONFIG_OPLUS_FEATURE_GKI_CPUFREQ_BOUNCING) += oplus_cpu/cpufreq_bouncing/
 obj-$(CONFIG_OPLUS_OMRG) += oplus_cpu/oplus_omrg/
 #endif /* OPLUS_FEATURE_OMRG */
 
+#ifdef OPLUS_FEATURE_ABNORMAL_FLAG
+#ziyu.qi@oppo.com, 2023/02/25, Add for task overload
+obj-$(CONFIG_OPLUS_FEATURE_ABNORMAL_FLAG) += oplus_cpu/oplus_overload/
+#endif
 
 obj-$(CONFIG_SCF_TORTURE_TEST) += scftorture.o
 

@@ -1007,6 +1007,7 @@ static struct mtk_panel_params ext_params[MODE_NUM] = {
         },
 	.skip_unnecessary_switch = true,
 	.prete_offset = 466,
+	.first_prete_delay_time = 14000,
 	},
 	//fhd 90hz
 {

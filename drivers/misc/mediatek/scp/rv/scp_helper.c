@@ -1071,6 +1071,13 @@ void scp_wdt_reset(int cpu_id)
 #endif
 	switch (cpu_id) {
 	case 0:
+#ifdef OPLUS_FEATURE_SENSOR
+/*Xuemeng.Ma@PSW.BSP.SENSOR, 2021/09/01,add for ALPS06107163*/
+		if (IS_ERR_OR_NULL((void const *) scpreg.cfg_core0)) {
+			pr_debug("[SCP] scpreg.cfg_core0 error\n");
+			return;
+		}
+#endif /* OPLUS_FEATURE_SENSOR */
 		writel(V_INSTANT_WDT, R_CORE0_WDT_CFG);
 		break;
 	case 1:

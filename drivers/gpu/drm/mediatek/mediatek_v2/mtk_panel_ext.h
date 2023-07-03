@@ -530,6 +530,7 @@ struct mtk_panel_params {
 	unsigned int oplus_cmdq_pkt_set_event;
 	/*#ifdef OPLUS_FEATURE_DISPLAY*/
 	unsigned int prete_offset;
+	unsigned int first_prete_delay_time;
 	/*#endif*/
 	unsigned int use_free_pointer_check;
 };

@@ -413,7 +413,7 @@
 			rcupdate.rcu_expedited=1 \
 			8250.nr_uarts=4 \
 			swiotlb=noforce \
-			initcall_debug=1 cma=64M transparent_hugepage=never \
+			initcall_debug=1 transparent_hugepage=never \
 			allow_mismatched_32bit_el0 \
 			firmware_class.path=/vendor/firmware \
 			log_buf_len=2m";	//Fuchun.Liao 2021/10/15 modify log_buf size
@@ -977,8 +977,8 @@
 
 	memory_ssmr_features: memory-ssmr-features {
 		compatible = "mediatek,memory-ssmr-features";
-		svp-region-based-size = <0 0x6000000>;
-		svp-page-based-size = <0 0x38000000>;
+		svp-region-based-size = <0 0x3000000>;
+		svp-page-based-size = <0 0x19000000>;
 		tui-size = <0 0x4000000>;
 		wfd-region-based-size = <0 0x4000000>;
 		wfd-page-based-size = <0 0x4000000>;

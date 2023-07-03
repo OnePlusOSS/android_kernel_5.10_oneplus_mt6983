@@ -94,6 +94,25 @@ EXPORT_SYMBOL(g_mobile_log);
 //#endif /*OPLUS_BUG_STABILITY*/
 EXPORT_SYMBOL(g_msync_debug);
 
+#ifdef OPLUS_FEATURE_DISPLAY
+bool g_aal_probe_ready = false;
+EXPORT_SYMBOL(g_aal_probe_ready);
+bool g_c3d_probe_ready = false;
+EXPORT_SYMBOL(g_c3d_probe_ready);
+bool g_ccorr_probe_ready = false;
+EXPORT_SYMBOL(g_ccorr_probe_ready);
+bool g_color_probe_ready = false;
+EXPORT_SYMBOL(g_color_probe_ready);
+bool g_dither_probe_ready = false;
+EXPORT_SYMBOL(g_dither_probe_ready);
+bool g_tdshp_probe_ready = false;
+EXPORT_SYMBOL(g_tdshp_probe_ready);
+bool g_dmdp_probe_ready = false;
+EXPORT_SYMBOL(g_dmdp_probe_ready);
+bool g_gamma_probe_ready = false;
+EXPORT_SYMBOL(g_gamma_probe_ready);
+#endif
+
 bool g_irq_log;
 bool g_trace_log = true;
 bool g_mml_debug;
@@ -164,6 +183,10 @@ static char *debug_buffer;
 static bool logger_enable = 1;
 #else
 static bool logger_enable;
+#endif
+
+#ifdef OPLUS_FEATURE_DISPLAY
+extern void mtk_gamma_regdump(void);
 #endif
 
 static int draw_RGBA8888_buffer(char *va, int w, int h,
@@ -3334,6 +3357,9 @@ static void process_dbg_opt(const char *opt)
 	} else if (strncmp(opt, "pq_dump", 7) == 0) {
 		unsigned int dump_flag = 0;
 		int ret;
+#ifdef OPLUS_FEATURE_DISPLAY
+		struct mtk_drm_private *priv = drm_dev->dev_private;
+#endif
 
 		ret = sscanf(opt, "pq_dump:%x\n", &dump_flag);
 		if (ret != 1) {
@@ -3342,20 +3368,32 @@ static void process_dbg_opt(const char *opt)
 		}
 
 		DDPMSG("pq start dump, dump flag:0x%x\n", dump_flag);
-		if (dump_flag & 0x1)
+
+#ifdef OPLUS_FEATURE_DISPLAY
+		if (disp_helper_get_stage() == DISP_HELPER_STAGE_NORMAL) {
+			if (!priv->power_state) {
+				DDPPR_ERR("DRM dev is not in power on state, skip pq_dump\n");
+				return;
+			}
+		}
+
+		if (g_aal_probe_ready && (dump_flag & 0x1))
 			mtk_aal_regdump();
-		if (dump_flag & 0x2)
+		if (g_c3d_probe_ready && (dump_flag & 0x2))
 			mtk_c3d_regdump();
-		if (dump_flag & 0x4)
+		if (g_ccorr_probe_ready && (dump_flag & 0x4))
 			mtk_ccorr_regdump();
-		if (dump_flag & 0x8)
+		if (g_color_probe_ready && (dump_flag & 0x8))
 			mtk_color_regdump();
-		if (dump_flag & 0x10)
+		if (g_dither_probe_ready && (dump_flag & 0x10))
 			mtk_dither_regdump();
-		if (dump_flag & 0x20)
+		if (g_tdshp_probe_ready && (dump_flag & 0x20))
 			mtk_disp_tdshp_regdump();
-		if (dump_flag & 0x40)
+		if (g_dmdp_probe_ready && (dump_flag & 0x40))
 			mtk_dmdp_aal_regdump();
+		if (g_gamma_probe_ready && (dump_flag & 0x80))
+			mtk_gamma_regdump();
+#endif
 	} else if (strncmp(opt, "esd_check", 9) == 0) {
 		unsigned int esd_check_en = 0;
 		struct drm_crtc *crtc;
@@ -4302,4 +4340,79 @@ void set_logger_enable(int enable)
 }
 EXPORT_SYMBOL(set_logger_enable);
 //#endif
+
+#ifdef OPLUS_FEATURE_DISPLAY
+void pq_dump_all(unsigned int dump_flag)
+{
+	struct drm_crtc *crtc;
+	struct mtk_drm_crtc *mtk_crtc;
+	struct mtk_drm_private *priv = NULL;
+
+	DDPMSG("pq dump idle off flag:0x%x\n", dump_flag);
+	/* this debug cmd only for crtc0 */
+	crtc = list_first_entry(&(drm_dev)->mode_config.crtc_list,
+				typeof(*crtc), head);
+	if (!crtc) {
+		DDPPR_ERR("find crtc fail\n");
+		return;
+	}
+
+	mtk_drm_set_idlemgr(crtc, 0, 1);
+
+	DDPMSG("pq set diagnose dump flag:0x%x\n", dump_flag);
+	drm_for_each_crtc(crtc, drm_dev) {
+		if (!crtc) {
+			DDPPR_ERR("find crtc fail\n");
+			continue;
+		}
+
+		mtk_crtc = to_mtk_crtc(crtc);
+		if (!crtc->enabled
+			|| mtk_crtc->ddp_mode == DDP_NO_USE)
+			continue;
+
+		mtk_drm_crtc_analysis(crtc);
+		mtk_drm_crtc_dump(crtc);
+	}
+
+	priv = mtk_crtc->base.dev->dev_private;
+	if (disp_helper_get_stage() == DISP_HELPER_STAGE_NORMAL) {
+		if (!priv->power_state) {
+			DDPPR_ERR("DRM dev is not in power on state, skip %s\n",
+				__func__);
+			return;
+		}
+	}
+
+	DDPMSG("pq dump flag:0x%x\n", dump_flag);
+	if (g_aal_probe_ready && (dump_flag & 0x1))
+		mtk_aal_regdump();
+	if (g_c3d_probe_ready && (dump_flag & 0x2))
+		mtk_c3d_regdump();
+	if (g_ccorr_probe_ready && (dump_flag & 0x4))
+		mtk_ccorr_regdump();
+	if (g_color_probe_ready && (dump_flag & 0x8))
+		mtk_color_regdump();
+	if (g_dither_probe_ready && (dump_flag & 0x10))
+		mtk_dither_regdump();
+	if (g_tdshp_probe_ready && (dump_flag & 0x20))
+		mtk_disp_tdshp_regdump();
+	if (g_dmdp_probe_ready && (dump_flag & 0x40))
+		mtk_dmdp_aal_regdump();
+	if (g_gamma_probe_ready && (dump_flag & 0x80))
+		mtk_gamma_regdump();
+
+	DDPMSG("pq idle on dump flag:0x%x\n", dump_flag);
+	/* this debug cmd only for crtc0 */
+	crtc = list_first_entry(&(drm_dev)->mode_config.crtc_list,
+				typeof(*crtc), head);
+	if (!crtc) {
+		DDPPR_ERR("find crtc fail\n");
+		return;
+	}
+
+	mtk_drm_set_idlemgr(crtc, 1, 1);
+}
+EXPORT_SYMBOL(pq_dump_all);
+#endif
 

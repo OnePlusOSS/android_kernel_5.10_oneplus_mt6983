@@ -90,7 +90,6 @@
 	oplus,chg_ops = "plat-pmic";
 	qcom,hv_flashled_support;
 	qcom,chargerid_support;
-	oplus,smooth_switch_v2;
 	qcom,smart_chg_soh_support;
 	oplus,aging_ffc_version = <1>;
 	qcom,smart_charging_screenoff;
@@ -324,12 +323,19 @@
 		reg = <0x5A>;
 		reset-gpio = <&pio 21 0x00>;
 		irq-gpio = <&pio 14 0x00>;
-		qcom,device_id = <815>;
-		haptic_hv_vmax = /bits/ 8 < 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x02 0x07 0x0C 0x12 0x17 0x1C 0x1D 0x1F 0x25 >;
-		haptic_hv_gain = /bits/ 8 < 0x40 0x49 0x51 0x5A 0x62 0x6B 0x73 0x7C 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 >;
-
 		pinctrl-names = "default";
 		pinctrl-0 = <&aw_irq_gpio_default>;
+		qcom,device_id = <815>;
+
+		/* haptic ic 1: aw86907 */
+		oplus,aw86907_boost_voltage = <40>; /* 0x28 */
+		haptic_hv_aw86907_vmax = /bits/ 8 < 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x02 0x07 0x0C 0x12 0x17 0x1C 0x1D 0x1F 0x28 >;
+		haptic_hv_aw86907_gain = /bits/ 8 < 0x40 0x49 0x51 0x5A 0x62 0x6B 0x73 0x7C 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 >;
+
+		/* haptic ic 2: aw86927 */
+		oplus,aw86927_boost_voltage = <90>; /* 0x5A */
+		haptic_hv_vmax = /bits/ 8 < 0x28 0x28 0x28 0x28 0x28 0x28 0x28 0x28 0x2A 0x31 0x38 0x3F 0x46 0x4C 0x51 0x5A 0x5A >;
+		haptic_hv_gain = /bits/ 8 < 0x40 0x49 0x51 0x5A 0x62 0x6B 0x73 0x7C 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 >;
 	};
 };
 
@@ -1604,29 +1610,29 @@
 		};
 		svooc_charge_curve {
 			strategy_soc_0_to_50 {
-				strategy_temp_little_cold =	<4184 23 10 0
-								 4424 15 15 0
+				strategy_temp_little_cold =	<4184 25 10 0
+								 4424 15 10 0
 								 4430 10 10 1>;
-				strategy_temp_cool =		<4184 25 15 0
-								 4424 20 10 0
+				strategy_temp_cool =		<4184 30 15 0
+								 4424 25 10 0
 								 4430 10 10 1>;
-				strategy_temp_little_cool = 	<4184 55 35 0
-								 4454 40 25 0
-								 4484 30 10 0
+				strategy_temp_little_cool =	<4184 60 35 0
+								 4454 45 25 0
+								 4484 35 10 0
 								 4490 10 10 1>;
 				strategy_temp_normal_low =	<4134 73 55 0
 								 4184 60 50 0
-								 4224 55 35 0
-								 4454 40 25 0
-								 4484 30 10 0
+								 4224 60 35 0
+								 4454 45 25 0
+								 4484 35 10 0
 								 4490 10 10 1>;
 				strategy_temp_normal_high =	<4134 73 55 0
 								 4184 60 50 0
-								 4224 55 35 0
-								 4454 40 25 0
-								 4484 30 10 0
-								 4490 10 10 1>;
-				strategy_temp_warm =	<4130 10 10 1>;
+								 4224 60 35 0
+								 4454 45 25 0
+								 4484 35 10 0
+								 4490 15 12 1>;
+				strategy_temp_warm =		<4130 15 12 1>;
 			};
 
 			strategy_soc_50_to_75 {
@@ -1634,39 +1640,39 @@
 								 4430 10 10 1>;
 				strategy_temp_cool =		<4424 20 10 0
 								 4430 10 10 1>;
-				strategy_temp_little_cool =	<4454 40 25 0
-								 4484 30 10 0
+				strategy_temp_little_cool =	<4454 45 25 0
+								 4484 35 10 0
 								 4490 10 10 1>;
-				strategy_temp_normal_low =	<4454 40 25 0
-								 4484 30 10 0
+				strategy_temp_normal_low =	<4454 45 25 0
+								 4484 35 10 0
 								 4490 10 10 1>;
-				strategy_temp_normal_high =	<4424 45 35 0
-								 4454 40 25 0
-								 4484 30 10 0
-								 4490 10 10 1>;
+				strategy_temp_normal_high =	<4224 45 35 0
+								 4454 45 25 0
+								 4484 35 10 0
+								 4490 15 12 1>;
 			};
 
 			strategy_soc_75_to_85 {
-				strategy_temp_little_cold = 	<4430 10 10 0>;
+				strategy_temp_little_cold =	<4430 10 10 1>;
 				strategy_temp_cool =		<4424 15 10 0
 								 4430 10 10 1>;
 				strategy_temp_little_cool =	<4484 25 10 0
 								 4490 10 10 1>;
 				strategy_temp_normal_low =	<4484 30 10 0
-								 4490 10 10 1 0>;
-				strategy_temp_normal_high =	<4484 30 10 0
 								 4490 10 10 1>;
+				strategy_temp_normal_high =	<4484 30 10 0
+								 4490 15 12 1>;
 			};
 
 			strategy_soc_85_to_90 {
-				strategy_temp_little_cold = 	<4430 10 10 1>;
+				strategy_temp_little_cold =	<4430 10 10 1>;
 				strategy_temp_cool =		<4430 10 10 1>;
 				strategy_temp_little_cool =	<4484 15 10 0
 								 4490 10 10 1>;
 				strategy_temp_normal_low =	<4484 20 10 0
 								 4490 10 10 1>;
 				strategy_temp_normal_high =	<4484 20 10 0
-								 4490 10 10 1>;
+								 4490 15 12 1>;
 			};
 		};
 	};

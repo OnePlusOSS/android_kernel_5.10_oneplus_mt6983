@@ -811,6 +811,30 @@ int oplus_ofp_doze_status_handle(bool doze_enable, void *drm_crtc, void *mtk_pan
 	return 0;
 }
 
+int oplus_ofp_set_aod_light_mode_after_doze_enable(void *mtk_panel_ext, void *mtk_dsi, void *dcs_write_gce)
+{
+	struct mtk_panel_ext *ext = mtk_panel_ext;
+	struct oplus_ofp_params *p_oplus_ofp_params = oplus_ofp_get_params();
+
+	OFP_DEBUG("start\n");
+
+	if (!ext || !mtk_dsi || !dcs_write_gce || !p_oplus_ofp_params) {
+		OFP_ERR("Invalid params\n");
+		return -EINVAL;
+	}
+
+	if (p_oplus_ofp_params->aod_light_mode) {
+		if (ext->funcs && ext->funcs->set_aod_light_mode) {
+			ext->funcs->set_aod_light_mode(mtk_dsi, dcs_write_gce, NULL, p_oplus_ofp_params->aod_light_mode);
+			OFP_INFO("set_aod_light_mode:%u\n", p_oplus_ofp_params->aod_light_mode);
+		}
+	}
+
+	OFP_DEBUG("end\n");
+
+	return 0;
+}
+
 /* aod off cmd cmdq set */
 int oplus_ofp_aod_off_set_cmdq(struct drm_crtc *crtc)
 {
@@ -1430,64 +1454,104 @@ ssize_t oplus_ofp_set_hbm_attr(struct kobject *obj,
 	return count;
 }
 
-/* aod part */
-int oplus_ofp_get_aod_light_mode(void *buf)
-{
-	unsigned int *mode = buf;
-	struct oplus_ofp_params *p_oplus_ofp_params = oplus_ofp_get_params();
-
-	if (!p_oplus_ofp_params) {
-		OFP_ERR("Invalid params\n");
-		return -EINVAL;
-	}
-
-	OFP_INFO("aod_light_mode = %d\n", p_oplus_ofp_params->aod_light_mode);
-	(*mode) = p_oplus_ofp_params->aod_light_mode;
-
-	return 0;
-}
-
 int oplus_ofp_set_aod_light_mode(void *buf)
 {
-	unsigned int *mode = buf;
+	int rc = 0;
+	unsigned int *aod_light_mode = buf;
+	static unsigned int last_aod_light_mode = 0;
 	struct oplus_ofp_params *p_oplus_ofp_params = oplus_ofp_get_params();
 
 	OFP_DEBUG("start\n");
 
-	if (!p_oplus_ofp_params) {
+	if (!buf || !p_oplus_ofp_params) {
 		OFP_ERR("Invalid params\n");
 		return -EINVAL;
 	}
 
-	if (!(p_oplus_ofp_params->aod_state)) {
-		OFP_ERR("not in aod mode, no need set aod_light_mode\n");
-		return -EINVAL;
-	}
+	last_aod_light_mode = p_oplus_ofp_params->aod_light_mode;
+	p_oplus_ofp_params->aod_light_mode = (*aod_light_mode);
+	OFP_INFO("aod_light_mode:%u\n", p_oplus_ofp_params->aod_light_mode);
+	mtk_drm_trace_c("%d|oplus_ofp_aod_light_mode|%d", g_commit_pid, p_oplus_ofp_params->aod_light_mode);
 
-	OFP_INFO("%d to %d\n", p_oplus_ofp_params->aod_light_mode, *mode);
-
-	if (!oplus_ofp_get_aod_state()) {
+	if (!oplus_ofp_is_support()) {
+		OFP_DEBUG("aod is not supported\n");
+		return 0;
+	} else if (!oplus_ofp_get_aod_state()) {
 		OFP_ERR("not in aod mode, should not set aod_light_mode\n");
+		return 0;
+	} else if (oplus_ofp_get_hbm_state()) {
+		OFP_INFO("ignore aod light mode setting in hbm state\n");
 		return 0;
 	}
 
-	if (oplus_ofp_is_support()) {
-		if (oplus_ofp_get_hbm_state()) {
-			OFP_INFO("ignore aod light mode setting in hbm state\n");
-			return 0;
-		}
-	}
-
-	if (*mode != p_oplus_ofp_params->aod_light_mode) {
-		OFP_INFO("set aod brightness to %s nit\n", (*mode == 0)? "50": "10");
-		mtkfb_set_aod_backlight_level(*mode);
-		p_oplus_ofp_params->aod_light_mode = (*mode);
-		mtk_drm_trace_c("%d|oplus_ofp_aod_light_mode|%d", g_commit_pid, p_oplus_ofp_params->aod_light_mode);
+	if (last_aod_light_mode != p_oplus_ofp_params->aod_light_mode) {
+		mtkfb_set_aod_backlight_level(p_oplus_ofp_params->aod_light_mode);
 	}
 
 	OFP_DEBUG("end\n");
 
+	return rc;
+}
+
+int oplus_ofp_get_aod_light_mode(void *buf)
+{
+	unsigned int *aod_light_mode = buf;
+	struct oplus_ofp_params *p_oplus_ofp_params = oplus_ofp_get_params();
+
+	OFP_DEBUG("start\n");
+
+	if (!buf || !p_oplus_ofp_params) {
+		OFP_ERR("Invalid params\n");
+		return -EINVAL;
+	}
+
+	*aod_light_mode = p_oplus_ofp_params->aod_light_mode;
+	OFP_INFO("aod_light_mode:%u\n", *aod_light_mode);
+
+	OFP_DEBUG("end\n");
+
 	return 0;
+}
+
+ssize_t oplus_ofp_set_aod_light_mode_attr(struct kobject *obj,
+	struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	unsigned int aod_light_mode = 0;
+	static unsigned int last_aod_light_mode = 0;
+	struct oplus_ofp_params *p_oplus_ofp_params = oplus_ofp_get_params();
+
+	OFP_DEBUG("start\n");
+
+	if (!buf || !p_oplus_ofp_params) {
+		OFP_ERR("Invalid params\n");
+		return count;
+	}
+
+	sscanf(buf, "%u", &aod_light_mode);
+
+	last_aod_light_mode = p_oplus_ofp_params->aod_light_mode;
+	p_oplus_ofp_params->aod_light_mode = aod_light_mode;
+	OFP_INFO("aod_light_mode:%u\n", p_oplus_ofp_params->aod_light_mode);
+	mtk_drm_trace_c("%d|oplus_ofp_aod_light_mode|%d", g_commit_pid, p_oplus_ofp_params->aod_light_mode);
+
+	if (!oplus_ofp_is_support()) {
+		OFP_DEBUG("aod is not supported\n");
+		return count;
+	} else if (!oplus_ofp_get_aod_state()) {
+		OFP_ERR("not in aod mode, should not set aod_light_mode\n");
+		return count;
+	} else if (oplus_ofp_get_hbm_state()) {
+		OFP_INFO("ignore aod light mode setting in hbm state\n");
+		return count;
+	}
+
+	if (last_aod_light_mode != p_oplus_ofp_params->aod_light_mode) {
+		mtkfb_set_aod_backlight_level(p_oplus_ofp_params->aod_light_mode);
+	}
+
+	OFP_DEBUG("end\n");
+
+	return count;
 }
 
 ssize_t oplus_ofp_get_aod_light_mode_attr(struct kobject *obj,
@@ -1495,63 +1559,18 @@ ssize_t oplus_ofp_get_aod_light_mode_attr(struct kobject *obj,
 {
 	struct oplus_ofp_params *p_oplus_ofp_params = oplus_ofp_get_params();
 
-	if (!p_oplus_ofp_params) {
-		OFP_ERR("Invalid params\n");
-		return -EINVAL;
-	}
-
-	OFP_INFO("aod_light_mode = %d\n", p_oplus_ofp_params->aod_light_mode);
-
-	return sprintf(buf, "%d\n", p_oplus_ofp_params->aod_light_mode);
-}
-
-ssize_t oplus_ofp_set_aod_light_mode_attr(struct kobject *obj,
-	struct kobj_attribute *attr, const char *buf, size_t count)
-{
-	unsigned int mode = 0;
-	struct oplus_ofp_params *p_oplus_ofp_params = oplus_ofp_get_params();
-
 	OFP_DEBUG("start\n");
 
-	if (!p_oplus_ofp_params) {
+	if (!buf || !p_oplus_ofp_params) {
 		OFP_ERR("Invalid params\n");
-		return count;
-	}
-
-	if (!(p_oplus_ofp_params->aod_state)) {
-		OFP_ERR("not in aod mode, no need set aod_light_mode\n");
 		return -EINVAL;
 	}
 
-	if (kstrtouint(buf, 10, &mode)) {
-		OFP_ERR("kstrtouint error!\n");
-		return count;
-	}
-
-	OFP_INFO("%d to %d\n", p_oplus_ofp_params->aod_light_mode, mode);
-
-	if (!oplus_ofp_get_aod_state()) {
-		OFP_ERR("not in aod mode, should not set aod_light_mode\n");
-		return count;
-	}
-
-	if (oplus_ofp_is_support()) {
-		if (oplus_ofp_get_hbm_state()) {
-			OFP_INFO("ignore aod light mode setting in hbm state\n");
-			return count;
-		}
-	}
-
-	if (mode != p_oplus_ofp_params->aod_light_mode) {
-		OFP_INFO("set aod brightness to %s nit\n", (mode == 0)? "50": "10");
-		mtkfb_set_aod_backlight_level(mode);
-		p_oplus_ofp_params->aod_light_mode = mode;
-		mtk_drm_trace_c("%d|oplus_ofp_aod_light_mode|%d", g_commit_pid, p_oplus_ofp_params->aod_light_mode);
-	}
+	OFP_INFO("aod_light_mode:%u\n", p_oplus_ofp_params->aod_light_mode);
 
 	OFP_DEBUG("end\n");
 
-	return count;
+	return sprintf(buf, "%u\n", p_oplus_ofp_params->aod_light_mode);
 }
 
 MODULE_AUTHOR("Liuhe Zhong");

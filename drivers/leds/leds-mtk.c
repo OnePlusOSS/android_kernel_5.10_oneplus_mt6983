@@ -233,10 +233,18 @@ static int mtk_set_hw_brightness(struct mt_led_data *led_dat,
 		brightness = min(brightness, led_dat->conf.limit_hw_brightness);
 		brightness = max(brightness, led_dat->conf.min_hw_brightness);
 	}
-	pr_info("set hw brightness: %d -> %d", led_dat->hw_brightness, brightness);
 
-	if (brightness == led_dat->hw_brightness)
-		return 0;
+	/*#ifdef OPLUS_FEATURE_DISPLAY*/
+	if (brightness == led_dat->hw_brightness) {
+		led_dat->repeat_count += 1;
+		if (led_dat->repeat_count > 1)
+			return 0;
+	} else {
+		led_dat->repeat_count = 0;
+	}
+
+	pr_info("set hw brightness(%s): %d -> %d", led_dat->conf.cdev.name, led_dat->hw_brightness, brightness);
+	/*end*/
 
 	if (led_dat->mtk_hw_brightness_set(led_dat, brightness) >= 0) {
 		led_dat->hw_brightness = brightness;
@@ -509,6 +517,11 @@ int mt_leds_classdev_register(struct device *parent,
 	led_dat->last_brightness = led_dat->conf.cdev.brightness;
 	if (led_dat->mtk_conn_id_get(led_dat, 1) >= 0)
 		pr_notice("get connector id failed!");
+
+	/*#ifdef OPLUS_FEATURE_DISPLAY*/
+	led_dat->repeat_count = 0;
+	/*end*/
+
 //#ifndef OPLUS_BUG_STABILITY
 	//mtk_set_hw_brightness(led_dat,
 		//brightness_maptolevel(&led_dat->conf, led_dat->last_brightness));

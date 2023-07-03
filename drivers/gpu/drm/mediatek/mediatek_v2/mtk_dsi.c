@@ -2715,6 +2715,10 @@ static void mtk_output_en_doze_switch(struct mtk_dsi *dsi)
 
 		panel_funcs->doze_enable(dsi->panel, dsi,
 			mipi_dsi_dcs_write_gce2, NULL);
+
+/* #ifdef OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT */
+		oplus_ofp_set_aod_light_mode_after_doze_enable(dsi->ext, dsi, mipi_dsi_dcs_write_gce2);
+/* #endif */ /* OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT */
 	}
 
 	if (doze_enabled && panel_funcs->doze_area)
@@ -2998,6 +3002,10 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi,
 
 				ext->funcs->doze_enable(dsi->panel, dsi,
 					mipi_dsi_dcs_write_gce2, NULL);
+
+/* #ifdef OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT */
+				oplus_ofp_set_aod_light_mode_after_doze_enable(ext, dsi, mipi_dsi_dcs_write_gce2);
+/* #endif */ /* OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT */
 			}
 			if (ext && ext->funcs
 				&& ext->funcs->doze_area)

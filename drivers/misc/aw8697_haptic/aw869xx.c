@@ -125,6 +125,7 @@ static void aw869xx_set_bst_vol(struct aw_haptic *aw_haptic, uint8_t bst_vol)
 		bst_vol = 0x3f;
 	i2c_w_bits(aw_haptic, AW869XX_REG_PLAYCFG1,
 		   AW869XX_BIT_PLAYCFG1_BST_VOUT_RDA_MASK, bst_vol);
+	aw_dev_info("%s: bst_vol 0x%02X", __func__, bst_vol);
 }
 
 static void aw869xx_set_wav_seq(struct aw_haptic *aw_haptic, uint8_t wav,

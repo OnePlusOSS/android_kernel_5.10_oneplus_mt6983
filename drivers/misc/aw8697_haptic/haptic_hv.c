@@ -3756,61 +3756,100 @@ int i2c_w_bits(struct aw_haptic *aw_haptic, uint8_t reg_addr, uint32_t mask,
 }
 
 #define DEFAULT_BOOST_VOLT 0x4F
+#define DEFAULT_BOOST_VOLT_AW86907 0x1F
 #define VMAX_GAIN_NUM 17
 static int parse_dt(struct device *dev, struct aw_haptic *aw_haptic,
 			 struct device_node *np)
 {
-	int max_boost_voltage = 0;
-	uint8_t vmax[VMAX_GAIN_NUM];
-	uint8_t gain[VMAX_GAIN_NUM];
-	uint32_t val = 0;
-	int i = 0;
-
 	aw_haptic->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
 	if (aw_haptic->reset_gpio < 0) {
 		aw_dev_err("%s: no reset gpio provide\n", __func__);
 		return -EPERM;
 	}
 	aw_dev_info("%s: reset gpio provide ok %d\n", __func__,
-		    aw_haptic->reset_gpio);
+		aw_haptic->reset_gpio);
 	aw_haptic->irq_gpio = of_get_named_gpio(np, "irq-gpio", 0);
 	if (aw_haptic->irq_gpio < 0)
 		aw_dev_err("%s: no irq gpio provided.\n", __func__);
 	else
 		aw_dev_info("%s: irq gpio provide ok irq = %d.\n",
-			    __func__, aw_haptic->irq_gpio);
+			__func__, aw_haptic->irq_gpio);
+
 #ifdef OPLUS_FEATURE_CHG_BASIC
 	if (of_property_read_u32(np, "qcom,device_id", &aw_haptic->device_id))
 		aw_haptic->device_id = 815;
 	aw_dev_info("%s: device_id=%d\n", __func__, aw_haptic->device_id);
-
-	if (of_property_read_u32(np, "oplus,aw86927_boost_voltage", &max_boost_voltage))
-		AW86927_HAPTIC_HIGH_LEVEL_REG_VAL = DEFAULT_BOOST_VOLT; /* boost 8.4V */
-	else
-		AW86927_HAPTIC_HIGH_LEVEL_REG_VAL = max_boost_voltage;
-	aw_dev_info("%s: aw86927 boost_voltage=%d\n", __func__, AW86927_HAPTIC_HIGH_LEVEL_REG_VAL);
 #endif
-	val = of_property_read_u8_array(np, "haptic_hv_vmax",
-						vmax, ARRAY_SIZE(vmax));
-	if (val != 0) {
-		aw_dev_info("aw_haptic_vmax not found");
-	} else {
-		for (i = 0; i < ARRAY_SIZE(vmax); i++) {
-			vmax_map[i].vmax = vmax[i];
-			aw_dev_info("vmax_map vmax: 0x%x vmax: 0x%x", vmax_map[i].vmax, vmax[i]);
-		}
-	}
 
-	val = of_property_read_u8_array(np, "haptic_hv_gain",
+	return 0;
+}
+
+static int parse_vibrate_param_dts(struct device *dev, struct aw_haptic *aw_haptic,
+			 struct device_node *np)
+{
+#ifdef OPLUS_FEATURE_CHG_BASIC
+	int max_boost_voltage = 0;
+	uint8_t vmax[VMAX_GAIN_NUM];
+	uint8_t gain[VMAX_GAIN_NUM];
+	uint32_t val = 0;
+	int i = 0;
+
+	if (aw_haptic->chipid == AW86907_CHIPID) {
+		if (of_property_read_u32(np, "oplus,aw86907_boost_voltage", &max_boost_voltage))
+			AW86927_HAPTIC_HIGH_LEVEL_REG_VAL = DEFAULT_BOOST_VOLT_AW86907; /* boost 8.4V */
+		else
+			AW86927_HAPTIC_HIGH_LEVEL_REG_VAL = max_boost_voltage;
+		aw_dev_info("%s: aw86907 boost_voltage=%d\n", __func__, AW86927_HAPTIC_HIGH_LEVEL_REG_VAL);
+
+		val = of_property_read_u8_array(np, "haptic_hv_aw86907_vmax",
+						vmax, ARRAY_SIZE(vmax));
+		if (val != 0) {
+			aw_dev_info("aw_haptic_aw86907_vmax not found\n");
+		} else {
+			for (i = 0; i < ARRAY_SIZE(vmax); i++) {
+				vmax_map[i].vmax = vmax[i];
+				aw_dev_info("_aw86907 vmax_map vmax: 0x%x vmax: 0x%x\n", vmax_map[i].vmax, vmax[i]);
+			}
+		}
+		val = of_property_read_u8_array(np, "haptic_hv_aw86907_gain",
 						gain, ARRAY_SIZE(gain));
-	if (val != 0) {
-		aw_dev_info("aw_haptic_gain not found");
+		if (val != 0) {
+			aw_dev_info("aw_haptic_aw86907_gain not found\n");
+		} else {
+			for (i = 0; i < ARRAY_SIZE(gain); i++) {
+				vmax_map[i].gain = gain[i];
+				aw_dev_info("_aw86907 vmax_map gain: 0x%x gain: 0x%x\n", vmax_map[i].gain, gain[i]);
+			}
+		}
 	} else {
-		for (i = 0; i < ARRAY_SIZE(gain); i++) {
-			vmax_map[i].gain = gain[i];
-			aw_dev_info("vmax_map gain: 0x%x gain: 0x%x", vmax_map[i].gain, gain[i]);
+		if (of_property_read_u32(np, "oplus,aw86927_boost_voltage", &max_boost_voltage))
+			AW86927_HAPTIC_HIGH_LEVEL_REG_VAL = DEFAULT_BOOST_VOLT; /* boost 8.4V */
+		else
+			AW86927_HAPTIC_HIGH_LEVEL_REG_VAL = max_boost_voltage;
+		aw_dev_info("%s: aw86927 boost_voltage=%d\n", __func__, AW86927_HAPTIC_HIGH_LEVEL_REG_VAL);
+
+		val = of_property_read_u8_array(np, "haptic_hv_vmax",
+						vmax, ARRAY_SIZE(vmax));
+		if (val != 0) {
+			aw_dev_info("aw_haptic_vmax not found\n");
+		} else {
+			for (i = 0; i < ARRAY_SIZE(vmax); i++) {
+				vmax_map[i].vmax = vmax[i];
+				aw_dev_info("vmax_map vmax: 0x%x vmax: 0x%x\n", vmax_map[i].vmax, vmax[i]);
+			}
+		}
+		val = of_property_read_u8_array(np, "haptic_hv_gain",
+						gain, ARRAY_SIZE(gain));
+		if (val != 0) {
+			aw_dev_info("aw_haptic_gain not found\n");
+		} else {
+			for (i = 0; i < ARRAY_SIZE(gain); i++) {
+				vmax_map[i].gain = gain[i];
+				aw_dev_info("vmax_map gain: 0x%x gain: 0x%x\n", vmax_map[i].gain, gain[i]);
+			}
 		}
 	}
+#endif
 
 	return 0;
 }
@@ -8065,7 +8104,13 @@ static long aw_file_unlocked_ioctl(struct file *file, unsigned int cmd,
 			ret = -EINVAL;
 			break;
 		}
-		aw_haptic->func->set_bst_vol(aw_haptic, 0x4F);//boost 8.414V
+		if (aw_haptic->chipid == AW86927_CHIPID)
+			aw_haptic->func->set_bst_vol(aw_haptic, 0x4F);//boost 8.414V
+		else if (aw_haptic->chipid == AW86907_CHIPID)
+			aw_haptic->func->set_bst_vol(aw_haptic, 0x1D); /*boost 8.287V*/
+		else
+			aw_haptic->func->set_bst_vol(aw_haptic, 0x4F);//boost 8.414V
+
 		aw_haptic->func->upload_lra(aw_haptic, AW_OSC_CALI_LRA);
 		aw_haptic->func->play_mode(aw_haptic, AW_RTP_MODE);
 		aw_haptic->func->play_go(aw_haptic, true);
@@ -8091,7 +8136,13 @@ static long aw_file_unlocked_ioctl(struct file *file, unsigned int cmd,
 		aw_haptic->func->play_stop(aw_haptic);
 		aw_haptic->done_flag = false;
 		aw_haptic->haptic_rtp_mode = true;
-		aw_haptic->func->set_bst_vol(aw_haptic, 0x4F);//boost 8.414V
+		if (aw_haptic->chipid == AW86927_CHIPID)
+			aw_haptic->func->set_bst_vol(aw_haptic, 0x4F);//boost 8.414V
+		else if (aw_haptic->chipid == AW86907_CHIPID)
+			aw_haptic->func->set_bst_vol(aw_haptic, 0x1D); /*boost 8.287V*/
+		else
+			aw_haptic->func->set_bst_vol(aw_haptic, 0x4F);//boost 8.414V
+
 		schedule_work(&aw_haptic->haptic_rtp_work);
 		break;
 	case RICHTAP_STOP_MODE:
@@ -8463,6 +8514,8 @@ static int awinic_i2c_probe(struct i2c_client *i2c,
 		aw_dev_err("%s: read_chipid failed ret=%d\n", __func__, ret);
 		goto err_id;
 	}
+
+	parse_vibrate_param_dts(&i2c->dev, aw_haptic, np);
 
 	sw_reset(aw_haptic);
 

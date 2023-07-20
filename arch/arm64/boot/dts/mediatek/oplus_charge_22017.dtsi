@@ -662,6 +662,9 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&i2c7_mode_default>;
 		//qcom,bq28z610_need_balancing;
+		battery_params {
+			#include "oplus_charge_22017_blp973_afi.dtsi"
+		};
 	};
 };
 

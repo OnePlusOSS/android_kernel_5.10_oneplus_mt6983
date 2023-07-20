@@ -12,6 +12,11 @@
             remote-endpoint = <&main_af>;
         };
     };
+    port@1 {
+        main_af1_endpoint: endpoint {
+            remote-endpoint = <&main_af1>;
+        };
+    };
 };
 
 &seninf_top {
@@ -358,6 +363,17 @@
         port {
             main_af: endpoint {
                 remote-endpoint = <&main_af_endpoint>;
+            };
+        };
+    };
+
+    camera_af_main1@0b {
+        compatible = "mediatek,ak7375c";
+        reg = <0x0b>;
+        vin-supply = <&fan53870_ldo6a>;
+        port {
+            main_af1: endpoint {
+                remote-endpoint = <&main_af1_endpoint>;
             };
         };
     };

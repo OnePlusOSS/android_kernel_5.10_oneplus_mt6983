@@ -870,7 +870,9 @@ static int fmt_gce_wait_callback(unsigned long arg)
 
 	mutex_unlock(fmt->mux_gce_th[identifier]);
 
-	cmdq_pkt_destroy(fmt->gce_task[taskid].pkt_ptr);
+	if (fmt->gce_task[taskid].pkt_ptr) {
+		cmdq_pkt_destroy(fmt->gce_task[taskid].pkt_ptr);
+	}
 	atomic_dec(&fmt->gce_task_wait_cnt[taskid]);
 	fmt_clear_gce_task(taskid);
 

@@ -69,6 +69,10 @@
 
 #include <soc/oplus/system/oplus_project.h>
 
+#ifdef OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
+#include "oplus_display_temp_compensation.h"
+#endif /* OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION */
+
 /* #ifdef OPLUS_FEATURE_ONSCREENFINGERPRINT */
 /* add for ofp */
 #include "oplus_display_onscreenfingerprint.h"
@@ -1012,12 +1016,6 @@ unsigned int last_backlight = 0;
 EXPORT_SYMBOL(last_backlight);
 bool pwm_power_on = false;
 EXPORT_SYMBOL(pwm_power_on);
-
-enum oplus_temp_compensation_setting_mode {
-	OPLUS_TEMP_COMPENSATION_NORMAL_SETTING = 0,					/* default compensation setting */
-	OPLUS_TEMP_COMPENSATION_FOD_ON_SETTING = 1,					/* set hbm compensation setting */
-	OPLUS_TEMP_COMPENSATION_FOD_OFF_SETTING = 2,				/* recover to normal backlight compensation setting */
-};
 /*#endif*/
 mtk_drm_setbacklight(struct drm_crtc *crtc, unsigned int level, bool atomic)
 {
@@ -1030,7 +1028,6 @@ mtk_drm_setbacklight(struct drm_crtc *crtc, unsigned int level, bool atomic)
 	bool is_frame_mode;
 	int index = drm_crtc_index(crtc);
 	int ret = 0;
-	unsigned int temp_level;
 
 	if (!pq_trigger && !atomic) {
 		backup_bl_level = level;
@@ -1153,39 +1150,39 @@ mtk_drm_setbacklight(struct drm_crtc *crtc, unsigned int level, bool atomic)
 	DDPINFO("%s fps: %d,level=%d,hpwm_mode=%d\n", __func__, g_cur_fps,level,hpwm_mode);
 
 	oplus_display_brightness = level;
+	hpwm_90nit_set_temp = 0;
 
 /*#ifdef OPLUS_FEATURE_DISPLAY*/
 	DDPINFO("DSI_SET_BL: hpwm_90nit_set_temp:%d,vact_timing_fps:%d,pwm_turbo:%d,pwm_power_on=%d last_backlight=%d\n", hpwm_90nit_set_temp,
 		mtk_crtc->panel_ext->params->dyn_fps.vact_timing_fps, hpwm_mode, pwm_power_on,last_backlight);
 
+	if (oplus_ofp_is_support()) {
+		if (oplus_ofp_backlight_filter(level)) {
+			goto end;
+		}
+	}
+
 	if (hpwm_mode) {
-		if (oplus_ofp_is_support()) {
-			if (!oplus_ofp_backlight_filter(level)) {
-				DDPINFO("DSI_SET_BL: hpwm_90nit_set_temp:%d,vact_timing_fps:%d,pwm_turbo:%d,pwm_power_on=%d\n", hpwm_90nit_set_temp,
-					mtk_crtc->panel_ext->params->dyn_fps.vact_timing_fps, hpwm_mode, pwm_power_on);
-				if ((((level <= 0x643) && (last_backlight > 0x643)) || (pwm_power_on == true && level <= 0x643))) {
-					DDPINFO("%s DSI_SET_BL sleep 0ms.<643\n", __func__);
-					if (comp->funcs && comp->funcs->io_cmd)
-						comp->funcs->io_cmd(comp, cmdq_handle, DSI_SET_HPWM_PLUSS_BL, &level);
-					hpwm_90nit_set_temp = 1;
-					pwm_power_on = false;
-					last_backlight =  level;
-				} else if ((((level > 0x643) && (last_backlight <= 0x643)) || (pwm_power_on == true && level > 0x643))) {
-					//cmdq_pkt_sleep(cmdq_handle, CMDQ_US_TO_TICK(8000), CMDQ_GPR_R06);
-					DDPINFO("%s DSI_SET_BL sleep 0ms.>643\n", __func__);
-					if (comp->funcs && comp->funcs->io_cmd)
-						comp->funcs->io_cmd(comp, cmdq_handle, DSI_SET_HPWM_PLUSS_BL, &level);
-					hpwm_90nit_set_temp = 2;
-					pwm_power_on = false;
-					last_backlight =  level;
-				}
-			}
+		DDPINFO("DSI_SET_BL: hpwm_90nit_set_temp:%d,vact_timing_fps:%d,pwm_turbo:%d,pwm_power_on=%d\n", hpwm_90nit_set_temp,
+			mtk_crtc->panel_ext->params->dyn_fps.vact_timing_fps, hpwm_mode, pwm_power_on);
+		if ((((level <= 0x643) && (last_backlight > 0x643)) || (pwm_power_on == true && level <= 0x643))) {
+			DDPINFO("%s DSI_SET_BL sleep 0ms.<643\n", __func__);
+			if (comp->funcs && comp->funcs->io_cmd)
+				comp->funcs->io_cmd(comp, cmdq_handle, DSI_SET_HPWM_PLUSS_BL, &level);
+			hpwm_90nit_set_temp = 1;
+			pwm_power_on = false;
+			last_backlight =  level;
+		} else if ((((level > 0x643) && (last_backlight <= 0x643)) || (pwm_power_on == true && level > 0x643))) {
+			//cmdq_pkt_sleep(cmdq_handle, CMDQ_US_TO_TICK(8000), CMDQ_GPR_R06);
+			DDPINFO("%s DSI_SET_BL sleep 0ms.>643\n", __func__);
+			if (comp->funcs && comp->funcs->io_cmd)
+				comp->funcs->io_cmd(comp, cmdq_handle, DSI_SET_HPWM_PLUSS_BL, &level);
+			hpwm_90nit_set_temp = 2;
+			pwm_power_on = false;
+			last_backlight =  level;
 		}
 
-		temp_level = OPLUS_TEMP_COMPENSATION_NORMAL_SETTING;
 		if (hpwm_90nit_set_temp == 0) {
-			if (comp->funcs && comp->funcs->io_cmd)
-				comp->funcs->io_cmd(comp, cmdq_handle, OPLUS_TEMP_COMPENSATION_SET, &temp_level);
 			if (comp->funcs && comp->funcs->io_cmd)
 				comp->funcs->io_cmd(comp, cmdq_handle, DSI_SET_BL, &level);
 			last_backlight =  level;
@@ -1196,19 +1193,19 @@ mtk_drm_setbacklight(struct drm_crtc *crtc, unsigned int level, bool atomic)
 				cmdq_pkt_sleep(cmdq_handle, CMDQ_US_TO_TICK(9300), CMDQ_GPR_R06);
 				DDPINFO("%s cmdq sleep 9.3ms \n", __func__);
 			}
-			if (comp->funcs && comp->funcs->io_cmd)
-				comp->funcs->io_cmd(comp, cmdq_handle, OPLUS_TEMP_COMPENSATION_SET, &temp_level);
 			hpwm_90nit_set_temp = 0;
 		}
 	} else {
 		if (comp->funcs && comp->funcs->io_cmd)
-			comp->funcs->io_cmd(comp, cmdq_handle, OPLUS_TEMP_COMPENSATION_SET, &temp_level);
-
-		if (comp->funcs && comp->funcs->io_cmd)
 			comp->funcs->io_cmd(comp, cmdq_handle, DSI_SET_BL, &level);
 							last_backlight =  level;
-		};
+	};
 	/*#endif*/
+
+end:
+#ifdef OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
+	oplus_temp_compensation_io_cmd_set(comp, cmdq_handle, OPLUS_TEMP_COMPENSATION_BACKLIGHT_SETTING);
+#endif /* OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION */
 
 	// #ifdef OPLUS_BUG_STABILITY
 	if (pq_trigger && flag_silky_panel &&
@@ -1539,7 +1536,7 @@ int oplus_mtk_drm_setseed(struct drm_crtc *crtc, unsigned int seed_mode)
 
 	return 0;
 }
-
+unsigned int hpwm_mode_90hz = 0;
 int mtk_crtc_set_high_pwm_switch(struct drm_crtc *crtc, unsigned int en)
 {
 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
@@ -1562,7 +1559,6 @@ int mtk_crtc_set_high_pwm_switch(struct drm_crtc *crtc, unsigned int en)
         DDPPR_ERR("hpwm_mode no changer\n");
 		return 0;
 	}
-	ext->params->f_high_pwm_en = en;
 
 	DDP_MUTEX_LOCK(&mtk_crtc->lock, __func__, __LINE__);
 
@@ -1575,6 +1571,16 @@ int mtk_crtc_set_high_pwm_switch(struct drm_crtc *crtc, unsigned int en)
 		DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
 		return -EINVAL;
 	}
+	if ((!strcmp(mtk_crtc->panel_ext->params->vendor, "22823_Tianma_NT37705"))){
+		if (src_mode == 2) {
+			hpwm_mode_90hz = 255;
+			pr_info("%s, src_mode=%d if 2 goto done\n", __func__, src_mode);
+			goto done;
+		} else {
+			hpwm_mode_90hz = 1;
+		}
+	}
+	ext->params->f_high_pwm_en = en;
 
 	mtk_drm_send_lcm_cmd_prepare_wait_for_vsync(crtc, &cmdq_handle);
 		/** wait one TE (no clear te) **/
@@ -1636,6 +1642,11 @@ int mtk_crtc_set_high_pwm_switch(struct drm_crtc *crtc, unsigned int en)
 	}
 
 	mtk_drm_send_lcm_cmd_flush(crtc, &cmdq_handle, 0);
+	if ((!strcmp(mtk_crtc->panel_ext->params->vendor, "22823_Tianma_NT37705"))){
+		if (en == 0) {
+			hpwm_mode_90hz = 0;
+		}
+	}
 
 	done:
 		DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
@@ -11074,6 +11085,10 @@ end:
 			(unsigned long)old_crtc_state);
 	mtk_drm_trace_end();
 	ktime_get_real_ts64(&atomic_flush_tval);
+
+#ifdef OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
+	oplus_temp_compensation_first_half_frame_cmd_set(crtc);
+#endif /* OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION */
 }
 
 static const struct drm_crtc_funcs mtk_crtc_funcs = {

@@ -2734,6 +2734,9 @@ static int feature_control(struct subdrv_ctx *ctx, MSDK_SENSOR_FEATURE_ENUM feat
             break;
         }
         break;
+    case SENSOR_FEATURE_GET_OFFSET_TO_START_OF_EXPOSURE:
+        *(MUINT32 *)(uintptr_t)(*(feature_data + 1)) = 1612000;
+        break;
     case SENSOR_FEATURE_GET_PERIOD:
         *feature_return_para_16++ = ctx->line_length;
         *feature_return_para_16 = ctx->frame_length;

@@ -674,6 +674,11 @@ struct mtk_panel_funcs {
 	/* add for mux switch control */
 	int (*set_vsync_switch)(struct drm_panel *panel, int vsync_mode);
 	//#endif
+
+#ifdef OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
+	int (*oplus_temp_compensation_set)(void *dsi, void *gce_cb, void *handle, unsigned int setting_mode);
+#endif /* OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION */
+
 	/*#ifdef OPLUS_BUG_STABILITY*/
 	int (*oplus_set_power)(uint32_t voltage_id, uint32_t voltage_value);
 	int (*oplus_update_power_value)(uint32_t voltage_id);
@@ -689,7 +694,6 @@ struct mtk_panel_funcs {
 	int (*lcm_high_pwm_set)(struct drm_panel *panel, void *dsi, dcs_write_gce_pack cb, void *handle, bool en_h_pwm);
 	int (*lcm_high_pwm_elvss)(void *dsi, dcs_write_gce_pack cb, void *handle, bool en_h_pwm);
 	int (*lcm_high_pwm_set_fps)(void *dsi, dcs_write_gce_pack cb, void *handle, int fps, bool en_h_pwm);
-	int (*oplus_temp_compensation_set)(void *dsi, dcs_write_gce_pack cb, void *handle, unsigned int setting_mode);
 	int (*lcm_high_pwm_set_plus_bl)(void *dsi, dcs_write_gce_pack cb, void *handle, unsigned int bl_lvl);
 	void (*cabc_switch)(void *dsi_drv, dcs_write_gce cb,void *handle, unsigned int cabc_mode);
 	int (*lcm_dc_post_enter)(void *dsi_drv, dcs_write_gce cb,

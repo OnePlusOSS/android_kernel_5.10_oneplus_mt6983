@@ -1279,11 +1279,6 @@ static int oplus_adfr_dsi_display_auto_mode_min_fps(struct drm_crtc *crtc, u32 e
 	if (crtc == NULL)
 			return -1;
 
-	if (oplus_adfr_need_to_filter_min_fps_cmd) {
-		ADFR_INFO("filter min fps %u setting\n", extend_frame);
-		return rc;
-	}
-
 	mtk_drm_trace_begin("dsi_display_auto_mode_min_fps");
 	/* send the commands to set auto mode min fps */
 	rc = dsi_panel_send_auto_minfps_dcs(crtc, extend_frame);
@@ -1394,7 +1389,7 @@ int oplus_adfr_temperature_detection_handle(void *mtk_ddp_comp, void *cmdq_pkt, 
 	static bool last_oplus_adfr_need_to_filter_min_fps_cmd = false;
 	unsigned int refresh_rate = 120;
 	int h_skew = SDC_ADFR;
-	struct mtk_ddp_comp *output_comp = mtk_ddp_comp;
+	struct mtk_ddp_comp *comp = mtk_ddp_comp;
 	struct cmdq_pkt *cmdq_handle = cmdq_pkt;
 	struct drm_crtc *crtc = NULL;
 	struct drm_display_mode *drm_mode = NULL;
@@ -1404,12 +1399,12 @@ int oplus_adfr_temperature_detection_handle(void *mtk_ddp_comp, void *cmdq_pkt, 
 		return 0;
 	}
 
-	if (!output_comp || !cmdq_handle) {
+	if (!comp || !cmdq_handle) {
 		ADFR_ERR("Invalid input params\n");
 		return -EINVAL;
 	}
 
-	crtc = &(output_comp->mtk_crtc->base);
+	crtc = &(comp->mtk_crtc->base);
 	if (!crtc) {
 		ADFR_ERR("Invalid crtc params\n");
 		return -EINVAL;
@@ -1446,7 +1441,7 @@ int oplus_adfr_temperature_detection_handle(void *mtk_ddp_comp, void *cmdq_pkt, 
 					minfps.extend_frame = OPLUS_ADFR_AUTO_MIN_FPS_MAX;
 				}
 				ADFR_INFO("ntc_temp:%d,shell_temp:%d,refresh_rate:%u,need to set min fps to %u\n", ntc_temp, shell_temp, refresh_rate, minfps.extend_frame);
-				mtk_ddp_comp_io_cmd(output_comp, cmdq_handle, SET_MINFPS, &minfps);
+				mtk_ddp_comp_io_cmd(comp, cmdq_handle, SET_MINFPS, &minfps);
 			}
 		}
 	} else {

@@ -13,7 +13,7 @@
  *   goodix:
  */
 
-&spi3 {
+&spi7 {
 #address-cells = <1>;
 #size-cells = <0>;
 status = "okay";

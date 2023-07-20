@@ -26,6 +26,9 @@
 #if IS_ENABLED(CONFIG_OPLUS_FEATURE_FRAME_BOOST)
 #include <../kernel/oplus_cpu/sched/frame_boost/frame_group.h>
 #endif
+#if IS_ENABLED(CONFIG_OPLUS_FEATURE_SCHED_ASSIST)
+#include <../kernel/oplus_cpu/sched/sched_assist/sa_common.h>
+#endif
 
 #define CREATE_TRACE_POINTS
 #include "sugov_trace.h"
@@ -1543,6 +1546,10 @@ static int __init cpufreq_mtk_init(void)
 			mtk_arch_set_freq_scale, NULL);
 	if (ret)
 		pr_info("register android_vh_arch_set_freq_scale failed\n");
+#endif
+
+#if IS_ENABLED(CONFIG_OPLUS_FEATURE_SCHED_ASSIST)
+	update_ux_sched_cputopo();
 #endif
 
 	return cpufreq_register_governor(&mtk_gov);

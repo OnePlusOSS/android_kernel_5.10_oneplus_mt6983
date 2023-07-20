@@ -69,6 +69,11 @@
 #include "oplus_adfr.h"
 #include "../../oplus/oplus_display_mtk_debug.h"
 //#endif
+
+#ifdef OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
+#include "oplus_display_temp_compensation.h"
+#endif /* OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION */
+
 /* #ifdef OPLUS_FEATURE_ONSCREENFINGERPRINT */
 /* add for ofp */
 #include "oplus_display_onscreenfingerprint.h"
@@ -1829,10 +1834,9 @@ static void mtk_dsi_calc_vdo_timing(struct mtk_dsi *dsi)
 			horizontal_backporch_byte =
 				ALIGN_TO((t_hbp * dsi_tmp_buf_bpp - 10), 4);
 
+			horizontal_frontporch_byte =
+				ALIGN_TO((t_hfp * dsi_tmp_buf_bpp - 12), 4);
 			if (panel_is_aries()) {
-				horizontal_frontporch_byte =
-					ALIGN_TO((t_hfp * dsi_tmp_buf_bpp - 12), 4);
-
 				ps_wc = readl(dsi->regs + DSI_PSCTRL) & 0x7fff;
 				pr_notice("[####] hsyn=0x%x chbp=0x%x hfp=0x%x ps_wc=0x%x lanes=%d\n", horizontal_sync_active_byte,
 						horizontal_backporch_byte, horizontal_frontporch_byte, ps_wc, dsi->lanes);
@@ -2956,6 +2960,12 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi,
 			DDPPR_ERR("failed to prepare the panel\n");
 			return;
 		}
+
+#ifdef OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
+		if (esd_flag == 1) {
+			oplus_temp_compensation_io_cmd_set(&dsi->ddp_comp, NULL, OPLUS_TEMP_COMPENSATION_ESD_SETTING);
+		}
+#endif /* OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION */
 
 		//#ifdef OPLUS_FEATURE_ESD
 		/* this code phase maybe after mode_switch*/
@@ -9311,13 +9321,6 @@ static int mtk_dsi_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 
 		panel_ext = mtk_dsi_get_panel_ext(comp);
 
-		DISP_DEBUG("DSI_SET_BL: backlight=%d\n", *(int *)params);
-		oplus_display_brightness = *(int *)params;
-
-		//if (panel_ext && panel_ext->funcs && panel_ext->funcs->oplus_temp_compensation_set) {
-		//	panel_ext->funcs->oplus_temp_compensation_set(dsi, mtk_dsi_cmdq_pack_gce, handle, oplus_display_brightness);
-		//}
-
 		if (panel_ext && panel_ext->funcs
 			&& panel_ext->funcs->set_backlight_cmdq) {
 			bool need_fliter_backlight = false;
@@ -10017,13 +10020,21 @@ static int mtk_dsi_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 		}
 	}
 		break;
+
+#ifdef OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
 	case OPLUS_TEMP_COMPENSATION_SET:
 	{
 		panel_ext = mtk_dsi_get_panel_ext(comp);
-		if (panel_ext && panel_ext->funcs && panel_ext->funcs->oplus_temp_compensation_set)
-			panel_ext->funcs->oplus_temp_compensation_set(dsi, mtk_dsi_cmdq_pack_gce, handle, *(unsigned int *)params);
+		if (panel_ext && panel_ext->funcs && panel_ext->funcs->oplus_temp_compensation_set) {
+			if (!handle) {
+				panel_ext->funcs->oplus_temp_compensation_set(dsi, mipi_dsi_dcs_write_gce2, NULL, *(unsigned int *)params);
+			} else {
+				panel_ext->funcs->oplus_temp_compensation_set(dsi, mtk_dsi_cmdq_pack_gce, handle, *(unsigned int *)params);
+			}
+		}
 	}
 		break;
+#endif /* OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION */
 
 	case DSI_SET_HPWM_PLUSS_BL:
 	{

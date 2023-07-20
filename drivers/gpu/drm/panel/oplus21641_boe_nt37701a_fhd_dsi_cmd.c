@@ -60,7 +60,7 @@ extern int oplus_dc_alpha;
 extern int oplus_dc_enable_real;
 static unsigned int esd_brightness = 1023;
 static u32 flag_hbm = 0;
-extern unsigned long oplus_display_brightness;
+extern unsigned int oplus_display_brightness;
 static bool aod_state = false;
 extern void disp_aal_set_dre_en(int enable);
 extern unsigned int oplus_enhance_mipi_strength;

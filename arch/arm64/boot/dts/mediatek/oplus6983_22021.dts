@@ -1507,6 +1507,12 @@
 	};
 };
 
+&soc {
+	oplus-theia {
+		is-dual-screen-pwk-monitor-switch;
+	};
+};
+
 /* CONNSYS TCXO GPIO start */
 &consys {
 	tcxo_support = "false";

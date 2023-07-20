@@ -48,6 +48,8 @@ extern int oplus_display_panel_get_pq_trigger(void *buf);
 extern int oplus_display_panel_set_pq_trigger(void *buf);
 extern int oplus_display_panel_set_pwm_status(void *buf);
 extern int oplus_display_panel_get_pwm_status(void *buf);
+extern int oplus_display_panel_get_pwm_status_for_90hz(void *buf);
+
 
 static const struct panel_ioctl_desc panel_ioctls[] = {
 	PANEL_IOCTL_DEF(PANEL_IOCTL_SET_POWER, oplus_display_panel_set_pwr),
@@ -109,6 +111,7 @@ static const struct panel_ioctl_desc panel_ioctls[] = {
 	PANEL_IOCTL_DEF(PANEL_IOCTL_GET_FP_TYPE, oplus_ofp_get_fp_type),
 	PANEL_IOCTL_DEF(PANEL_IOCTL_SET_PWM_STATUS, oplus_display_panel_set_pwm_status),
 	PANEL_IOCTL_DEF(PANEL_IOCTL_GET_PWM_STATUS, oplus_display_panel_get_pwm_status),
+	PANEL_IOCTL_DEF(PANEL_IOCTL_GET_PWM_STATUS_FOR_90HZ, oplus_display_panel_get_pwm_status_for_90hz),
 };
 
 static int panel_open(struct inode *inode, struct file *filp)

@@ -28,7 +28,7 @@ static struct STRUCT_CALIBRATION_LAYOUT_STRUCT cal_layout_table = {
 	0x00000006, 0x0146009B, CAM_CAL_SINGLE_EEPROM_DATA,
 	{
 		{0x00000001, 0x00000000, 0x00000000, do_module_version},
-		{0x00000001, 0x00000000, 0x00000002, do_part_number},
+		{0x00000001, 0x0000000A, 0x00000002, do_part_number},
 		{0x00000001, 0x00000B00, 0x0000074C, do_single_lsc_ov64b},
 		{0x00000001, 0x00000020, 0x00000030, do_2a_gain_ov64b},
 		{0x00000001, 0x00001300, 0x000005DC, do_pdaf_ov64b},

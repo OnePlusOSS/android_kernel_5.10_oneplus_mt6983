@@ -11,6 +11,9 @@
 #include <drm/drm_device.h>
 #include "mtk_panel_ext.h"
 #include "mtk_drm_ddp_comp.h"
+#include "mtk_drm_crtc.h"
+#include "mtk_drm_drv.h"
+#include "mtk_dsi.h"
 #include "oplus_display_temp_compensation.h"
 #include "oplus_display_onscreenfingerprint.h"
 #include "oplus_adfr_ext.h"
@@ -56,7 +59,7 @@ static int con_volt_ntc_100k_1840mv[] = {
 	47, 45
 };
 
-static unsigned char temp_compensation_paras[11][11][25] = {
+static unsigned char temp_compensation_data[11][11][25] = {
 	/* dbv > 3515 */
 	{
 		{16, 20, 24, 16, 20, 16, 20, 24, 58, 58, 58, 58, 58, 58, 58, 58, 58, 0, 0, 0, 0, 0, 0, 0, 0}, /* -20 ~ -10 */
@@ -228,6 +231,10 @@ static unsigned char temp_compensation_paras[11][11][25] = {
 extern unsigned int hpwm_mode;
 extern unsigned int oplus_display_brightness;
 
+/* extern functions */
+extern void ddic_dsi_send_cmd(unsigned int cmd_num, char val[20]);
+extern void mtk_read_ddic_v2(u8 ddic_reg, int ret_num, char ret_val[10]);
+extern void mtk_crtc_cmdq_timeout_cb(struct cmdq_cb_data data);
 
 /* -------------------- function implementation -------------------- */
 
@@ -236,6 +243,7 @@ int oplus_temp_compensation_register_ntc_channel(void *device)
 	static bool registered = false;
 	int rc = 0;
 	unsigned int i = 0;
+	static unsigned int failure_count = 0;
 	struct device *dev = device;
 
 	TEMP_COMPENSATION_DEBUG("start\n");
@@ -278,6 +286,14 @@ int oplus_temp_compensation_register_ntc_channel(void *device)
 		TEMP_COMPENSATION_INFO("register ntc channel successfully\n");
 	}
 
+	/* set max retry time to 5 */
+	if (!registered) {
+		failure_count++;
+		if (failure_count == 5) {
+			registered = true;
+		}
+	}
+
 	TEMP_COMPENSATION_DEBUG("end\n");
 
 	return rc;
@@ -306,7 +322,7 @@ static int oplus_temp_compensation_volt_to_temp(int volt)
 	return con_temp_ntc_100k_1840mv[i];
 }
 
-static int oplus_temp_compensation_get_ntc_temp(void)
+int oplus_temp_compensation_get_ntc_temp(void)
 {
 	int rc = 0;
 	int val_avg = 0;
@@ -402,6 +418,72 @@ static int oplus_temp_compensation_get_shell_temp(void)
 	return g_oplus_temp_compensation_params->shell_temp;
 }
 
+int oplus_temp_compensation_data_update(void)
+{
+	static bool calibrated = false;
+	int delta1 = 0;
+	int delta2 = 0;
+	unsigned char page_3[6] = {0xF0, 0x55, 0xAA, 0x52, 0x08, 0x03};
+	unsigned char offset_33[2] = {0x6F, 0x21};
+	unsigned char rx_buf[7] = {0};
+	unsigned int i = 0;
+	unsigned int j = 0;
+	unsigned int k = 0;
+	static unsigned int failure_count = 0;
+
+	TEMP_COMPENSATION_DEBUG("start\n");
+
+	if (IS_ERR_OR_NULL(g_oplus_temp_compensation_params)) {
+		TEMP_COMPENSATION_DEBUG("temp compensation is not supported, no need to update temp compensation data\n");
+		return 0;
+	}
+
+	if (calibrated || failure_count > 10) {
+		TEMP_COMPENSATION_DEBUG("calibrated:%u,failure_count:%u, no need to update temp compensation data\n", calibrated, failure_count);
+		return 0;
+	}
+
+	ddic_dsi_send_cmd(6, page_3);
+	ddic_dsi_send_cmd(2, offset_33);
+	mtk_read_ddic_v2(0xE0, 7, rx_buf);
+
+	TEMP_COMPENSATION_INFO("rx_buf[0]=%u,rx_buf[6]=%u\n", rx_buf[0], rx_buf[6]);
+	if ((rx_buf[0] < 25) || (rx_buf[0] > 29) || (rx_buf[6] < 26) || (rx_buf[6] > 30)) {
+		failure_count++;
+		TEMP_COMPENSATION_ERR("invalid rx_buf,failure_count:%u\n", failure_count);
+		return -EINVAL;
+	}
+
+	delta1 = rx_buf[0] - 0x1B;
+	delta2 = rx_buf[1] - 0x1C;
+	TEMP_COMPENSATION_DEBUG("delta1=%d,delta2=%d\n", delta1, delta2);
+
+	for (i = OPLUS_TEMP_COMPENSATION_1511_1604_DBV_INDEX; i <= OPLUS_TEMP_COMPENSATION_1212_1328_DBV_INDEX; i++) {
+		for (j = OPLUS_TEMP_COMPENSATION_LESS_THAN_MINUS10_TEMP_INDEX; j <= OPLUS_TEMP_COMPENSATION_GREATER_THAN_50_TEMP_INDEX; j++) {
+			for (k = 11; k <= 13; k++) {
+				temp_compensation_data[i][j][k] += delta2;
+			}
+			for (k = 14; k <= 16; k++) {
+				temp_compensation_data[i][j][k] += delta1;
+			}
+		}
+	}
+
+	i = OPLUS_TEMP_COMPENSATION_1604_3515_DBV_INDEX;
+	for (j = OPLUS_TEMP_COMPENSATION_LESS_THAN_MINUS10_TEMP_INDEX; j <= OPLUS_TEMP_COMPENSATION_GREATER_THAN_50_TEMP_INDEX; j++) {
+		for (k = 8; k <= 10; k++) {
+			temp_compensation_data[i][j][k] += delta1;
+		}
+	}
+
+	calibrated = true;
+	TEMP_COMPENSATION_INFO("update temp compensation data successfully\n");
+
+	TEMP_COMPENSATION_DEBUG("end\n");
+
+	return 0;
+}
+
 void oplus_temp_compensation_vpark_set(unsigned char voltage, struct LCM_setting_table *temp_compensation_cmd)
 {
 	unsigned char voltage1, voltage2, voltage3, voltage4;
@@ -467,7 +549,7 @@ static int oplus_temp_compensation_send_pack_hs_cmd(void *dsi, void *LCM_setting
 
 	TEMP_COMPENSATION_DEBUG("start\n");
 
-	if (!dsi || !table || !lcm_cmd_count || !cb) {
+	if (!dsi || !table || !lcm_cmd_count || !cb || !handle) {
 		TEMP_COMPENSATION_ERR("Invalid params\n");
 		return -EINVAL;
 	}
@@ -492,20 +574,22 @@ static int oplus_temp_compensation_send_pack_hs_cmd(void *dsi, void *LCM_setting
 	return 0;
 }
 
-int oplus_temp_compensation_cmd_set(void *dsi, void *p_dcs_write_gce_pack, void *handle, unsigned int setting_mode)
+int oplus_temp_compensation_cmd_set(void *mtk_dsi, void *gce_cb, void *handle, unsigned int setting_mode)
 {
 	int rc = 0;
 	int ntc_temp = 0;
 	unsigned int i = 0;
 	unsigned int j = 0;
 	unsigned int lcm_cmd_count = 0;
+	unsigned int refresh_rate = 120;
 	unsigned int dbv_index = 0;
 	unsigned int temp_index = 0;
 	unsigned int bl_lvl = 0;
 	static unsigned int last_dbv_index = 0;
 	static unsigned int last_temp_index = 0;
 	static unsigned int last_bl_lvl = 0;		/* Force sending temp compensation cmd when booting up */
-	dcs_write_gce_pack cb = p_dcs_write_gce_pack;
+	struct mtk_dsi *dsi = mtk_dsi;
+	dcs_write_gce cb = gce_cb;
 	struct LCM_setting_table temp_compensation_cmd[] = {
 		{REGFLAG_CMD, 6, {0xF0, 0x55, 0xAA, 0x52, 0x08, 0x01}},
 		{REGFLAG_CMD, 2, {0x6F, 0x06}},
@@ -537,21 +621,26 @@ int oplus_temp_compensation_cmd_set(void *dsi, void *p_dcs_write_gce_pack, void 
 
 	TEMP_COMPENSATION_DEBUG("start\n");
 
-	if (!dsi || !cb) {
+	if (!dsi || !gce_cb) {
 		TEMP_COMPENSATION_ERR("Invalid params\n");
 		return -EINVAL;
 	}
 
 	bl_lvl = oplus_display_brightness;
 
-//#ifdef OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT
+	TEMP_COMPENSATION_DEBUG("setting_mode:%u\n", setting_mode);
+
+/* #ifdef OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT */
 	if (oplus_ofp_is_support()) {
-		if ((oplus_ofp_get_hbm_state() && (setting_mode == OPLUS_TEMP_COMPENSATION_NORMAL_SETTING))
-				|| (setting_mode == OPLUS_TEMP_COMPENSATION_FOD_ON_SETTING)) {
+		if ((setting_mode == OPLUS_TEMP_COMPENSATION_FOD_ON_SETTING)
+				|| (oplus_ofp_get_hbm_state() && (setting_mode != OPLUS_TEMP_COMPENSATION_FOD_OFF_SETTING))) {
 			bl_lvl = 3840;
 		}
 	}
-//#endif /* OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT */
+/* #endif */ /* OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT */
+
+	refresh_rate = dsi->ext->params->dyn_fps.vact_timing_fps;
+	TEMP_COMPENSATION_DEBUG("refresh_rate:%u\n", refresh_rate);
 
 	if (bl_lvl > 3515) {
 		dbv_index = OPLUS_TEMP_COMPENSATION_GREATER_THAN_3515_DBV_INDEX;
@@ -581,60 +670,70 @@ int oplus_temp_compensation_cmd_set(void *dsi, void *p_dcs_write_gce_pack, void 
 		TEMP_COMPENSATION_DEBUG("panel ntc is not exist, use default ntc temp value\n");
 		ntc_temp = 29;
 	} else {
-		ntc_temp = g_oplus_temp_compensation_params->ntc_temp;
+		if (!last_bl_lvl && bl_lvl) {
+			/* update ntc temp immediately when power on */
+			ntc_temp = oplus_temp_compensation_get_ntc_temp();
+		} else {
+			ntc_temp = g_oplus_temp_compensation_params->ntc_temp;
+		}
 	}
 
 	temp_index = oplus_temp_compensation_get_temp_index(ntc_temp);
 
-	TEMP_COMPENSATION_DEBUG("bl_lvl=%u,ntc_temp=%d,shell_temp=%d,dbv_index=%u,temp_index=%u,last_dbv_index=%u,last_temp_index=%u\n",
-			bl_lvl, ntc_temp, oplus_temp_compensation_get_shell_temp(), dbv_index, temp_index, last_dbv_index, last_temp_index);
+	TEMP_COMPENSATION_DEBUG("last_bl_lvl:%u,bl_lvl:%u,last_dbv_index:%u,dbv_index:%u,shell_temp:%d,ntc_temp:%d,last_temp_index:%u,temp_index:%u\n",
+			last_bl_lvl, bl_lvl, last_dbv_index, dbv_index, oplus_temp_compensation_get_shell_temp(), ntc_temp,
+				last_temp_index, temp_index);
 
-	if ((last_dbv_index != dbv_index) || (last_temp_index != temp_index) || (!last_bl_lvl && bl_lvl)) {
-		for (i = 0; i < 4; i++) {
-			temp_compensation_cmd[2].para_list[i+1] = temp_compensation_paras[dbv_index][temp_index][0];
-			temp_compensation_cmd[4].para_list[i+1] = temp_compensation_paras[dbv_index][temp_index][1];
-			temp_compensation_cmd[6].para_list[i+1] = temp_compensation_paras[dbv_index][temp_index][2];
-			temp_compensation_cmd[12].para_list[i+1] = temp_compensation_paras[dbv_index][temp_index][5];
-			temp_compensation_cmd[14].para_list[i+1] = temp_compensation_paras[dbv_index][temp_index][6];
-			temp_compensation_cmd[16].para_list[i+1] = temp_compensation_paras[dbv_index][temp_index][7];
+	if ((last_dbv_index != dbv_index) || (last_temp_index != temp_index) || (!last_bl_lvl && bl_lvl)
+			|| (setting_mode == OPLUS_TEMP_COMPENSATION_ESD_SETTING) || (setting_mode == OPLUS_TEMP_COMPENSATION_FIRST_HALF_FRAME_SETTING)) {
+		if ((refresh_rate == 60) && (setting_mode == OPLUS_TEMP_COMPENSATION_BACKLIGHT_SETTING)
+			&& (bl_lvl != 0) && (bl_lvl != 1) && (!hpwm_mode) && (!IS_ERR_OR_NULL(g_oplus_temp_compensation_params))) {
+			g_oplus_temp_compensation_params->need_to_set_in_first_half_frame = true;
+			TEMP_COMPENSATION_DEBUG("need_to_set_in_first_half_frame:%d\n", g_oplus_temp_compensation_params->need_to_set_in_first_half_frame);
+		} else {
+			for (i = 0; i < 4; i++) {
+				temp_compensation_cmd[2].para_list[i+1] = temp_compensation_data[dbv_index][temp_index][0];
+				temp_compensation_cmd[4].para_list[i+1] = temp_compensation_data[dbv_index][temp_index][1];
+				temp_compensation_cmd[6].para_list[i+1] = temp_compensation_data[dbv_index][temp_index][2];
+				temp_compensation_cmd[12].para_list[i+1] = temp_compensation_data[dbv_index][temp_index][5];
+				temp_compensation_cmd[14].para_list[i+1] = temp_compensation_data[dbv_index][temp_index][6];
+				temp_compensation_cmd[16].para_list[i+1] = temp_compensation_data[dbv_index][temp_index][7];
 
-			if (hpwm_mode) {
-				temp_compensation_cmd[25].para_list[i+1] = temp_compensation_paras[dbv_index][temp_index][21+i];
-			} else {
-				temp_compensation_cmd[25].para_list[i+1] = temp_compensation_paras[dbv_index][temp_index][17+i];
-			}
-		}
-
-		for (i = 0; i < 3; i++) {
-			temp_compensation_cmd[8].para_list[i+1] = temp_compensation_paras[dbv_index][temp_index][3];
-			temp_compensation_cmd[10].para_list[i+1] = temp_compensation_paras[dbv_index][temp_index][4];
-			temp_compensation_cmd[18].para_list[i+1] = temp_compensation_paras[dbv_index][temp_index][8+i];
-			temp_compensation_cmd[20].para_list[i+1] = temp_compensation_paras[dbv_index][temp_index][11+i];
-			temp_compensation_cmd[22].para_list[i+1] = temp_compensation_paras[dbv_index][temp_index][14+i];
-		}
-
-		if (last_dbv_index != dbv_index) {
-			TEMP_COMPENSATION_INFO("dbv index change, set temp compensation cmd\n");
-		} else if (last_temp_index != temp_index) {
-			TEMP_COMPENSATION_INFO("temp index change, set temp compensation cmd\n");
-		} else if (!last_bl_lvl && bl_lvl) {
-			TEMP_COMPENSATION_INFO("panel resume, set temp compensation cmd\n");
-		}
-
-		lcm_cmd_count = sizeof(temp_compensation_cmd) / sizeof(struct LCM_setting_table);
-		rc = oplus_temp_compensation_send_pack_hs_cmd(dsi, temp_compensation_cmd, lcm_cmd_count, cb, handle);
-		if (rc) {
-			TEMP_COMPENSATION_ERR("failed to send pack hs cmd\n");
-		}
-
-		if ((oplus_temp_compensation_log_level >= OPLUS_TEMP_COMPENSATION_LOG_LEVEL_DEBUG)
-				&& (oplus_dsi_log_type & OPLUS_TEMP_COMPENSATION_DEBUG_LOG_TEMP_COMPENSATION)) {
-			for(i = 0; i < lcm_cmd_count; i++) {
-				pr_info(KERN_CONT "[TEMP_COMPENSATION][DEBUG][%s:%d]temp_compensation_cmd[%u]", __func__, __LINE__, i);
-				for (j = 0; j < temp_compensation_cmd[i].count; j++) {
-					pr_info(KERN_CONT "0x%02X ", temp_compensation_cmd[i].para_list[j]);
+				if (hpwm_mode) {
+					temp_compensation_cmd[25].para_list[i+1] = temp_compensation_data[dbv_index][temp_index][21+i];
+				} else {
+					temp_compensation_cmd[25].para_list[i+1] = temp_compensation_data[dbv_index][temp_index][17+i];
 				}
-				pr_info(KERN_CONT "\n");
+			}
+
+			for (i = 0; i < 3; i++) {
+				temp_compensation_cmd[8].para_list[i+1] = temp_compensation_data[dbv_index][temp_index][3];
+				temp_compensation_cmd[10].para_list[i+1] = temp_compensation_data[dbv_index][temp_index][4];
+				temp_compensation_cmd[18].para_list[i+1] = temp_compensation_data[dbv_index][temp_index][8+i];
+				temp_compensation_cmd[20].para_list[i+1] = temp_compensation_data[dbv_index][temp_index][11+i];
+				temp_compensation_cmd[22].para_list[i+1] = temp_compensation_data[dbv_index][temp_index][14+i];
+			}
+
+			TEMP_COMPENSATION_INFO("refresh_rate:%u,setting_mode:%u\n", refresh_rate, setting_mode);
+			TEMP_COMPENSATION_INFO("last_bl_lvl:%u,bl_lvl:%u,last_dbv_index:%u,dbv_index:%u,ntc_temp:%d,last_temp_index:%u,temp_index:%u,set temp compensation cmd\n",
+				last_bl_lvl, bl_lvl, last_dbv_index, dbv_index, ntc_temp, last_temp_index, temp_index);
+
+			lcm_cmd_count = sizeof(temp_compensation_cmd) / sizeof(struct LCM_setting_table);
+			if (!handle) {
+				for (i = 0; i < lcm_cmd_count; i++) {
+					cb(dsi, handle, temp_compensation_cmd[i].para_list, temp_compensation_cmd[i].count);
+				}
+			} else {
+				rc = oplus_temp_compensation_send_pack_hs_cmd(dsi, temp_compensation_cmd, lcm_cmd_count, gce_cb, handle);
+				if (rc) {
+					TEMP_COMPENSATION_ERR("failed to send pack hs cmd\n");
+				}
+			}
+
+			for (i = 0; i < lcm_cmd_count; i++) {
+				for (j = 0; j < temp_compensation_cmd[i].count; j++) {
+					TEMP_COMPENSATION_DEBUG("temp_compensation_cmd[%u][%u]=0x%02X\n", i, j, temp_compensation_cmd[i].para_list[j]);
+				}
 			}
 		}
 	}
@@ -649,19 +748,174 @@ int oplus_temp_compensation_cmd_set(void *dsi, void *p_dcs_write_gce_pack, void 
 }
 EXPORT_SYMBOL(oplus_temp_compensation_cmd_set);
 
+
+static void oplus_temp_compensation_cmdq_cb(struct cmdq_cb_data data)
+{
+	struct mtk_cmdq_cb_data *cb_data = data.data;
+
+	TEMP_COMPENSATION_DEBUG("start\n");
+
+	if (!cb_data) {
+		TEMP_COMPENSATION_ERR("Invalid params\n");
+		return;
+	}
+
+	TEMP_COMPENSATION_INFO("set temp compensation cmd in the first half frame cb done\n");
+	cmdq_pkt_destroy(cb_data->cmdq_handle);
+	kfree(cb_data);
+
+	TEMP_COMPENSATION_DEBUG("end\n");
+
+	return;
+}
+
+int oplus_temp_compensation_first_half_frame_cmd_set(void *drm_crtc)
+{
+	bool is_frame_mode = true;
+	struct drm_crtc *crtc = drm_crtc;
+	struct mtk_drm_crtc *mtk_crtc = NULL;
+	struct mtk_ddp_comp *comp = NULL;
+	struct mtk_cmdq_cb_data *cb_data = NULL;
+	struct cmdq_client *client = NULL;
+	struct cmdq_pkt *cmdq_handle = NULL;
+
+	TEMP_COMPENSATION_DEBUG("start\n");
+
+	if (IS_ERR_OR_NULL(g_oplus_temp_compensation_params)) {
+		TEMP_COMPENSATION_DEBUG("Invalid g_oplus_temp_compensation_params params\n");
+		return -EINVAL;
+	}
+
+	/*
+	 temp compensation cmd should be sent in the first half frame in 60hz lpwm timing.
+	 otherwise,there would be a low probability backlight flash issue.
+	*/
+	if (g_oplus_temp_compensation_params->need_to_set_in_first_half_frame) {
+		TEMP_COMPENSATION_DEBUG("need to set temp compensation cmd in the first half frame\n");
+
+		if (IS_ERR_OR_NULL(crtc)) {
+			TEMP_COMPENSATION_ERR("Invalid input params\n");
+			return -EINVAL;
+		}
+
+		mtk_crtc = to_mtk_crtc(crtc);
+		if (IS_ERR_OR_NULL(mtk_crtc)) {
+			TEMP_COMPENSATION_ERR("Invalid mtk_crtc params\n");
+			return -EINVAL;
+		}
+
+		comp = mtk_ddp_comp_request_output(mtk_crtc);
+		if (IS_ERR_OR_NULL(comp)) {
+			TEMP_COMPENSATION_ERR("Invalid comp params\n");
+			return -EINVAL;
+		}
+
+		if (!(mtk_crtc->enabled)) {
+			TEMP_COMPENSATION_ERR("mtk_crtc is not enabled\n");
+			return -EINVAL;
+		}
+
+		cb_data = kmalloc(sizeof(*cb_data), GFP_KERNEL);
+		if (IS_ERR_OR_NULL(cb_data)) {
+			TEMP_COMPENSATION_ERR("failed to kmalloc cb_data\n");
+			return -EINVAL;
+		}
+
+		mtk_drm_idlemgr_kick(__func__, crtc, 0);
+
+		is_frame_mode = mtk_crtc_is_frame_trigger_mode(&mtk_crtc->base);
+
+		client = (is_frame_mode) ? mtk_crtc->gce_obj.client[CLIENT_CFG] :
+					mtk_crtc->gce_obj.client[CLIENT_DSI_CFG];
+
+#ifndef OPLUS_FEATURE_DISPLAY
+		cmdq_handle = cmdq_pkt_create(client);
+#else
+		mtk_crtc_pkt_create(&cmdq_handle, crtc, client);
+#endif /* OPLUS_FEATURE_DISPLAY */
+		if (IS_ERR_OR_NULL(cmdq_handle)) {
+			TEMP_COMPENSATION_ERR("Invalid cmdq_handle params\n");
+			kfree(cb_data);
+			return -EINVAL;
+		}
+
+		/* wait one TE */
+		cmdq_pkt_clear_event(cmdq_handle, mtk_crtc->gce_obj.event[EVENT_SYNC_TOKEN_TE]);
+		if (mtk_drm_lcm_is_connect(mtk_crtc)) {
+			cmdq_pkt_wait_no_clear(cmdq_handle, mtk_crtc->gce_obj.event[EVENT_SYNC_TOKEN_TE]);
+		}
+
+		if (mtk_crtc_with_sub_path(crtc, mtk_crtc->ddp_mode)) {
+			mtk_crtc_wait_frame_done(mtk_crtc, cmdq_handle, DDP_SECOND_PATH, 0);
+		} else {
+			mtk_crtc_wait_frame_done(mtk_crtc, cmdq_handle, DDP_FIRST_PATH, 0);
+		}
+
+		if (is_frame_mode) {
+			cmdq_pkt_clear_event(cmdq_handle, mtk_crtc->gce_obj.event[EVENT_STREAM_BLOCK]);
+			cmdq_pkt_wfe(cmdq_handle, mtk_crtc->gce_obj.event[EVENT_CABC_EOF]);
+		}
+
+		cmdq_handle->err_cb.cb = mtk_crtc_cmdq_timeout_cb;
+		cmdq_handle->err_cb.data = crtc;
+
+		TEMP_COMPENSATION_DEBUG("OPLUS_TEMP_COMPENSATION_FIRST_HALF_FRAME_SETTING\n");
+		oplus_temp_compensation_io_cmd_set(comp, cmdq_handle, OPLUS_TEMP_COMPENSATION_FIRST_HALF_FRAME_SETTING);
+
+		if (is_frame_mode) {
+			cmdq_pkt_set_event(cmdq_handle, mtk_crtc->gce_obj.event[EVENT_CABC_EOF]);
+			cmdq_pkt_set_event(cmdq_handle, mtk_crtc->gce_obj.event[EVENT_STREAM_BLOCK]);
+		}
+
+		cb_data->crtc = crtc;
+		cb_data->cmdq_handle = cmdq_handle;
+
+		if (cmdq_pkt_flush_threaded(cmdq_handle, oplus_temp_compensation_cmdq_cb, cb_data) < 0) {
+			TEMP_COMPENSATION_ERR("failed to flush oplus_temp_compensation_cmdq_cb\n");
+			return -EINVAL;
+		}
+
+		g_oplus_temp_compensation_params->need_to_set_in_first_half_frame = false;
+		TEMP_COMPENSATION_DEBUG("need_to_set_in_first_half_frame:%d\n", g_oplus_temp_compensation_params->need_to_set_in_first_half_frame);
+	}
+
+	TEMP_COMPENSATION_DEBUG("end\n");
+
+	return 0;
+}
+
+int oplus_temp_compensation_io_cmd_set(void *mtk_ddp_comp, void *cmdq_pkt, unsigned int setting_mode)
+{
+	struct mtk_ddp_comp *comp = mtk_ddp_comp;
+	struct cmdq_pkt *cmdq_handle = cmdq_pkt;
+
+	TEMP_COMPENSATION_DEBUG("start\n");
+
+	if (!comp) {
+		TEMP_COMPENSATION_ERR("Invalid params\n");
+		return -EINVAL;
+	}
+
+	TEMP_COMPENSATION_DEBUG("OPLUS_TEMP_COMPENSATION_SET\n");
+	mtk_ddp_comp_io_cmd(comp, cmdq_handle, OPLUS_TEMP_COMPENSATION_SET, &setting_mode);
+
+	TEMP_COMPENSATION_DEBUG("end\n");
+
+	return 0;
+}
+
 int oplus_temp_compensation_temp_check(void *mtk_ddp_comp, void *cmdq_pkt)
 {
 	int rc = 0;
 	int ntc_temp = 0;
 	int shell_temp = 0;
-	int last_ntc_temp = 0;
-	unsigned int setting_mode = OPLUS_TEMP_COMPENSATION_NORMAL_SETTING;
-	struct mtk_ddp_comp *output_comp = mtk_ddp_comp;
+	static int last_ntc_temp = 0;
+	struct mtk_ddp_comp *comp = mtk_ddp_comp;
 	struct cmdq_pkt *cmdq_handle = cmdq_pkt;
 
 	TEMP_COMPENSATION_DEBUG("start\n");
 
-	if (!output_comp || !cmdq_handle) {
+	if (!comp || !cmdq_handle) {
 		TEMP_COMPENSATION_ERR("Invalid intput params\n");
 		return -EINVAL;
 	}
@@ -671,23 +925,24 @@ int oplus_temp_compensation_temp_check(void *mtk_ddp_comp, void *cmdq_pkt)
 		return -EINVAL;
 	}
 
-	last_ntc_temp = g_oplus_temp_compensation_params->ntc_temp;
-	ntc_temp = oplus_temp_compensation_get_ntc_temp();
+	ntc_temp = g_oplus_temp_compensation_params->ntc_temp;
 	shell_temp = oplus_temp_compensation_get_shell_temp();
 
 	if (oplus_temp_compensation_get_temp_index(last_ntc_temp) != oplus_temp_compensation_get_temp_index(ntc_temp)) {
-		mtk_ddp_comp_io_cmd(output_comp, cmdq_handle, OPLUS_TEMP_COMPENSATION_SET, &setting_mode);
+		oplus_temp_compensation_io_cmd_set(comp, cmdq_handle, OPLUS_TEMP_COMPENSATION_TEMPERATURE_SETTING);
 		TEMP_COMPENSATION_INFO("last_ntc_temp:%d,current_ntc_temp:%d,bl_lvl:%u,update temp compensation cmd\n", last_ntc_temp, ntc_temp, oplus_display_brightness);
 	}
 
-#ifdef OPLUS_FEATURE_DISPLAY_ADFR
+/* #ifdef OPLUS_FEATURE_DISPLAY_ADFR */
 	if (oplus_adfr_is_support()) {
-		rc = oplus_adfr_temperature_detection_handle(output_comp, cmdq_handle, ntc_temp, shell_temp);
+		rc = oplus_adfr_temperature_detection_handle(comp, cmdq_handle, ntc_temp, shell_temp);
 		if (rc) {
 			TEMP_COMPENSATION_ERR("failed to handle temperature detection\n");
 		}
 	}
-#endif /* OPLUS_FEATURE_DISPLAY_ADFR */
+/* #endif */ /* OPLUS_FEATURE_DISPLAY_ADFR */
+
+	last_ntc_temp = g_oplus_temp_compensation_params->ntc_temp;
 
 	TEMP_COMPENSATION_DEBUG("end\n");
 
@@ -715,7 +970,7 @@ ssize_t oplus_temp_compensation_set_ntc_temp_attr(struct kobject *obj,
 		return count;
 	}
 
-	sscanf(buf, "%u", &ntc_temp);
+	sscanf(buf, "%d", &ntc_temp);
 	TEMP_COMPENSATION_INFO("ntc_temp:%d\n", ntc_temp);
 
 	if (ntc_temp == -1) {
@@ -768,7 +1023,7 @@ ssize_t oplus_temp_compensation_set_shell_temp_attr(struct kobject *obj,
 		return count;
 	}
 
-	sscanf(buf, "%u", &shell_temp);
+	sscanf(buf, "%d", &shell_temp);
 	TEMP_COMPENSATION_INFO("shell_temp:%d\n", shell_temp);
 
 	if (shell_temp == -1) {

@@ -39,6 +39,7 @@ extern unsigned int m_dc;
 extern bool g_dp_support;
 extern bool pq_trigger;
 extern unsigned int hpwm_mode;
+extern unsigned int hpwm_mode_90hz;
 
 
 extern struct drm_device* get_drm_device(void);
@@ -58,6 +59,8 @@ enum {
 	CABC_LEVEL_2 = 3,
 	CABC_EXIT_SPECIAL = 8,
 	CABC_ENTER_SPECIAL = 9,
+	GLOBAL_DRE_OPEN = 10,
+	GLOBAL_DRE_CLOSE = 11,
 };
 
 int oplus_display_set_brightness(void *buf)
@@ -69,7 +72,7 @@ int oplus_display_set_brightness(void *buf)
 
 	printk("%s %d\n", __func__, oplus_set_brightness);
 
-	if (oplus_set_brightness > OPLUS_MAX_BRIGHTNESS || oplus_set_brightness < OPLUS_MIN_BRIGHTNESS) {
+	if (oplus_set_brightness > OPLUS_MAX_BRIGHTNESS) {
 		printk(KERN_ERR "%s, brightness:%d out of scope\n", __func__, oplus_set_brightness);
 		return -1;
 	}
@@ -202,6 +205,18 @@ int oplus_display_panel_set_cabc(void *buf)
 		cabc_mode, cabc_back_flag, mtk_crtc->panel_ext->params->oplus_display_global_dre);
 	if (cabc_mode < 4) {
 		cabc_back_flag = cabc_mode;
+	}
+
+	if (mtk_crtc->panel_ext->params->oplus_display_global_dre) {
+		if (cabc_mode == GLOBAL_DRE_OPEN) {
+			disp_aal_set_dre_en(1);
+			printk("%s adb cmd enable dre\n", __func__);
+			return 0;
+		} else if (cabc_mode == GLOBAL_DRE_CLOSE) {
+			disp_aal_set_dre_en(0);
+			printk("%s adb cmd disable dre\n", __func__);
+			return 0;
+		}
 	}
 
 	if (cabc_mode == CABC_ENTER_SPECIAL) {
@@ -452,6 +467,7 @@ int oplus_display_panel_set_pwm_status(void *data)
 {
 	int rc = 0;
 	struct drm_crtc *crtc;
+	struct mtk_drm_crtc *mtk_crtc;
 	struct drm_device *ddev = get_drm_device();
 	unsigned int *pwm_status = data;
 
@@ -468,10 +484,16 @@ int oplus_display_panel_set_pwm_status(void *data)
 		printk(KERN_ERR "find crtc fail\n");
 		return 0;
 	}
+	mtk_crtc = to_mtk_crtc(crtc);
+	if (!mtk_crtc || !mtk_crtc->panel_ext || !mtk_crtc->panel_ext->params) {
+		pr_err("falied to get lcd proc info\n");
+		return -EINVAL;
+	}
 
-	rc = mtk_crtc_set_high_pwm_switch(crtc, *pwm_status);
-	hpwm_mode = (long)*pwm_status;
-
+	if ((!strcmp(mtk_crtc->panel_ext->params->vendor, "22823_Tianma_NT37705"))) {
+		rc = mtk_crtc_set_high_pwm_switch(crtc, *pwm_status);
+		hpwm_mode = (long)*pwm_status;
+	}
 	return rc;
 }
 
@@ -504,6 +526,37 @@ int oplus_display_panel_get_pwm_status(void *buf)
 
 	return 0;
 }
+
+int oplus_display_panel_get_pwm_status_for_90hz(void *buf)
+{
+	struct drm_crtc *crtc;
+	struct mtk_drm_crtc *mtk_crtc;
+	struct drm_device *ddev = get_drm_device();
+	unsigned int *pwm_status = buf;
+
+	/* this debug cmd only for crtc0 */
+	crtc = list_first_entry(&(ddev)->mode_config.crtc_list,
+				typeof(*crtc), head);
+	if (!crtc) {
+		printk(KERN_ERR "find crtc fail\n");
+		return -1;
+	}
+	mtk_crtc = to_mtk_crtc(crtc);
+	if (!mtk_crtc || !mtk_crtc->panel_ext || !mtk_crtc->panel_ext->params) {
+		pr_err("falied to get lcd proc info\n");
+		return -EINVAL;
+	}
+
+	if (!strcmp(mtk_crtc->panel_ext->params->vendor, "22823_Tianma_NT37705")) {
+		*pwm_status = hpwm_mode_90hz;
+		pr_info("%s: high hpwm_mode_90hz = %d\n", __func__, hpwm_mode_90hz);
+	} else {
+		*pwm_status = 10;
+	}
+
+	return 0;
+}
+
 
 MODULE_AUTHOR("Xiaolei Gao");
 MODULE_DESCRIPTION("OPLUS common device");

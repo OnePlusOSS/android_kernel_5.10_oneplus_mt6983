@@ -6567,6 +6567,10 @@ static void mtk_drm_shutdown(struct platform_device *pdev)
 
 	if (drm) {
 		DDPMSG("%s\n", __func__);
+		//#ifdef OPLUS_FEATURE_DISPLAY
+		if (mtkfb_set_backlight_level(0))
+			DDPMSG("%s, set panel backlight 0 failed!\n", __func__);
+		//#endif
 		drm_atomic_helper_shutdown(drm);
 
 		//#ifdef OPLUS_FEATURE_DISPLAY

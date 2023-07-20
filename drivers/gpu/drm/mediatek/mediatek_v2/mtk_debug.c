@@ -4175,11 +4175,8 @@ void disp_dbg_probe(void)
 	mtkfb_dbgfs = debugfs_create_file("mtkfb", S_IFREG | 0440, NULL,
 					  NULL, &debug_fops);
 
-	/*#ifdef OPLUS_BUG_STABILITY*/
-	if ((get_eng_version() == AGING) || (get_eng_version() == PREVERSION) || (get_eng_version() == HIGH_TEMP_AGING) 
-		|| (get_eng_version() == HIGH_TEMP_AGING) || (get_eng_version() == FACTORY))
-		logger_enable = 1;
-	/*#endif*/
+	logger_enable = 1;
+
 	d_folder = debugfs_create_dir("displowpower", NULL);
 	if (d_folder) {
 		d_file = debugfs_create_file("idletime", S_IFREG | 0644,

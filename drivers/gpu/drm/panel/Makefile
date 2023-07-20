@@ -148,5 +148,6 @@ mediatek-drm-panel-drv-y :=  \
 #obj-$(CONFIG_DRM_MEDIATEK_PANEL) += mediatek-drm-gateic.o
 #obj-$(CONFIG_DRM_MEDIATEK_PANEL) += mediatek-drm-panel-drv.o
 ccflags-$(CONFIG_DRM_MEDIATEK_PANEL) += -I$(srctree)/drivers/leds/
+ccflags-y += -DOPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
 subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/
 subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/

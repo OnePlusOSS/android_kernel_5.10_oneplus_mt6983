@@ -114,12 +114,15 @@ union command {
 #define MAX_POGOPIN_EVENT_TAG_LEN   32
 #define MAX_POGOPIN_EVENT_ID_LEN    20
 #define MAX_POGOPIN_PAYLOAD_LEN     1024
-#define POGOPIN_GET_SN_MS           500
+#define POGOPIN_GET_SN_MS           100
 
 #define KEYBOARD_FIRMWARE_NUM       2
 #define KEYBOARD_BRAND_MASK         0x30
 #define KEYBOARD_BRAND_ONEPLUE      0x2
 #define KEYBOARD_BRAND_SHIFT        4
+
+#define KEYBOARD_TOUCH_MASK         0x40
+#define KEYBOARD_TOUCH_BIT          6
 
 #define FW_PROGERSS_1		1
 #define FW_PROGRESS_2		2
@@ -191,6 +194,7 @@ struct i2c_hid {
 	u32 kpdmcu_fw_count[KEYBOARD_FIRMWARE_NUM];
 	u32 kpdmcu_fw_cnt;
 	u32 touchmcu_fw_count;
+	u8 keyboard_touch_status;
 	u8 report_sn[DEFAULT_SN_LEN - 1];
 	bool pogopin_detect_check;
 	const char *keyboard_firmware_name[KEYBOARD_FIRMWARE_NUM];

@@ -757,3 +757,19 @@ out:
 	trace_sched_select_task_rq_rt(p, select_reason, *target_cpu, sd_flag, sync);
 }
 
+unsigned int fake_cpuinfo_max_freq_cpu = -1;
+
+void op_show_cpuinfo_max_freq(void *data, struct cpufreq_policy *policy, unsigned int *max_freq)
+{
+	struct cpufreq_policy *bpolicy;
+
+	if (fake_cpuinfo_max_freq_cpu < 0 || fake_cpuinfo_max_freq_cpu > 6)
+	    return;
+
+	if (!cpumask_test_cpu(7,policy->related_cpus) || cpumask_weight(policy->related_cpus) > 1)
+	    return;
+
+	bpolicy = cpufreq_cpu_get(fake_cpuinfo_max_freq_cpu);
+	*max_freq = bpolicy->cpuinfo.max_freq;
+	cpufreq_cpu_put(bpolicy);
+}

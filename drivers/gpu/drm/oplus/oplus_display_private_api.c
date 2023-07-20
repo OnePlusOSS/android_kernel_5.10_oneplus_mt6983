@@ -20,8 +20,12 @@
 #include <linux/signal.h>
 
 #include <soc/oplus/system/oplus_project.h>
-#include "oplus_display_temp_compensation.h"
 #include "oplus_adfr.h"
+
+#ifdef OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
+#include "oplus_display_temp_compensation.h"
+#endif /* OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION */
+
 /* #ifdef OPLUS_FEATURE_ONSCREENFINGERPRINT */
 /* add for ofp */
 #include "oplus_display_onscreenfingerprint.h"
@@ -158,7 +162,7 @@ static ssize_t oplus_display_set_brightness(struct kobject *obj,
 
 	printk("%s %d\n", __func__, oplus_set_brightness);
 
-	if (oplus_set_brightness > OPLUS_MAX_BRIGHTNESS || oplus_set_brightness < OPLUS_MIN_BRIGHTNESS) {
+	if (oplus_set_brightness > OPLUS_MAX_BRIGHTNESS) {
 		printk(KERN_ERR "%s, brightness:%d out of scope\n", __func__, oplus_set_brightness);
 		return num;
 	}
@@ -381,9 +385,11 @@ int panel_serial_number_read(struct drm_crtc *crtc, char cmd, int num)
 	struct mtk_drm_crtc *mtk_crtc;
 
 	mtk_crtc = to_mtk_crtc(crtc);
-	comp = mtk_ddp_comp_request_output(mtk_crtc);
+	if (mtk_crtc) {
+		comp = mtk_ddp_comp_request_output(mtk_crtc);
+	}
 
-	if (!(mtk_crtc->enabled)) {
+	if (mtk_crtc && !(mtk_crtc->enabled)) {
 		pr_err("[lh]Sleep State set backlight stop --crtc not ebable\n");
 		return 0;
 	}
@@ -1297,7 +1303,7 @@ static ssize_t oplus_display_get_osc(struct kobject *kobj,
 {
         printk(KERN_INFO "osc_mode = %d\n", osc_mode);
 
-        return sprintf(buf, "%d\n", osc_mode);
+        return sprintf(buf, "%lu\n", osc_mode);
 }
 
 static ssize_t oplus_display_set_osc(struct kobject *kobj,
@@ -1307,13 +1313,16 @@ static ssize_t oplus_display_set_osc(struct kobject *kobj,
 	unsigned int temp_save = 0;
 	int ret = 0;
 	struct drm_device *ddev = get_drm_device();
-
+	if (!ddev) {
+		printk(KERN_ERR "find ddev fail\n");
+		return 0;
+	}
 	ret = kstrtouint(buf, 10, &temp_save);
 	printk(KERN_INFO "osc mode = %d\n", temp_save);
 
 	crtc = list_first_entry(&(ddev)->mode_config.crtc_list,
 				typeof(*crtc), head);
-	if (!crtc) {
+	if (IS_ERR_OR_NULL(crtc)) {
 		printk(KERN_ERR "find crtc fail\n");
 		return 0;
 	}
@@ -1407,6 +1416,10 @@ static OPLUS_ATTR(adfr_params, S_IRUGO|S_IWUSR, oplus_adfr_get_params, oplus_adf
 /* add for mux switch control */
 static OPLUS_ATTR(vsync_switch, S_IRUGO|S_IWUSR, oplus_get_vsync_switch, oplus_set_vsync_switch);
 /* #endif */
+#ifdef OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
+static OPLUS_ATTR(ntc_temp, S_IRUGO | S_IWUSR, oplus_temp_compensation_get_ntc_temp_attr, oplus_temp_compensation_set_ntc_temp_attr);
+static OPLUS_ATTR(shell_temp, S_IRUGO | S_IWUSR, oplus_temp_compensation_get_shell_temp_attr, oplus_temp_compensation_set_shell_temp_attr);
+#endif /* OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION */
 static OPLUS_ATTR(disp_trig_db, S_IRUGO|S_IWUSR, oplus_display_get_disp_trig_db,
                         oplus_display_set_disp_trig_db);
 static OPLUS_ATTR(write_panel_reg, S_IRUGO | S_IWUSR, NULL, oplus_display_set_panel_reg);
@@ -1416,8 +1429,6 @@ static OPLUS_ATTR(dim_dc_alpha, S_IRUGO|S_IWUSR, oplus_display_get_dim_dc_alpha,
 static OPLUS_ATTR(osc, S_IRUGO|S_IWUSR, oplus_display_get_osc, oplus_display_set_osc);
 static OPLUS_ATTR(pq_trigger, S_IRUGO|S_IWUSR, oplus_display_get_pq_trigger, oplus_display_set_pq_trigger);
 static OPLUS_ATTR(pwm_turbo, S_IRUGO|S_IWUSR, oplus_display_get_high_pwm, oplus_display_set_high_pwm);
-static OPLUS_ATTR(ntc_temp, S_IRUGO | S_IWUSR, oplus_temp_compensation_get_ntc_temp_attr, oplus_temp_compensation_set_ntc_temp_attr);
-static OPLUS_ATTR(shell_temp, S_IRUGO | S_IWUSR, oplus_temp_compensation_get_shell_temp_attr, oplus_temp_compensation_set_shell_temp_attr);
 
 EXPORT_SYMBOL(seed_mode);
 EXPORT_SYMBOL(oplus_max_normal_brightness);
@@ -1459,6 +1470,10 @@ static struct attribute *oplus_display_attrs[] = {
 	/* add for mux switch control */
 	&oplus_attr_vsync_switch.attr,
 /* #endif */
+#ifdef OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
+	&oplus_attr_ntc_temp.attr,
+	&oplus_attr_shell_temp.attr,
+#endif /* OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION */
 	&oplus_attr_disp_trig_db.attr,
 	&oplus_attr_write_panel_reg.attr,
 	&oplus_attr_panel_reg_cmd.attr,
@@ -1467,8 +1482,6 @@ static struct attribute *oplus_display_attrs[] = {
 	&oplus_attr_osc.attr,
 	&oplus_attr_pq_trigger.attr,
 	&oplus_attr_pwm_turbo.attr,
-	&oplus_attr_ntc_temp.attr,
-	&oplus_attr_shell_temp.attr,
 	NULL,	/* need to NULL terminate the list of attributes */
 };
 

@@ -20,8 +20,10 @@
 #include "mtk_log.h"
 #include "mtk_dump.h"
 #include "oplus_adfr.h"
-#include "oplus_display_temp_compensation.h"
 #include "../../input/touchscreen/oplus_touchscreen_v2/touchpanel_notify/touchpanel_event_notify.h"
+#ifdef OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
+#include "oplus_display_temp_compensation.h"
+#endif /* OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION */
 
 /* -------------------- parameters -------------------- */
 /* log level config */
@@ -404,7 +406,6 @@ static int oplus_ofp_hbm_wait_handle(struct drm_crtc *crtc, struct cmdq_pkt *cmd
 static int oplus_ofp_set_panel_hbm(struct drm_crtc *crtc, bool hbm_en)
 {
 	bool doze_en = false;
-	unsigned int setting_mode = OPLUS_TEMP_COMPENSATION_FOD_ON_SETTING;
 	struct oplus_ofp_params *p_oplus_ofp_params = oplus_ofp_get_params();
 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
 	struct mtk_ddp_comp *comp = mtk_ddp_comp_request_output(mtk_crtc);
@@ -459,15 +460,16 @@ static int oplus_ofp_set_panel_hbm(struct drm_crtc *crtc, bool hbm_en)
 	/* delay after hbm cmd */
 	oplus_ofp_hbm_wait_handle(crtc, cmdq_handle, false, hbm_en);
 
+#ifdef OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
 	/* set temp compensation paras */
 	mtk_drm_trace_begin("OPLUS_TEMP_COMPENSATION_SET");
 	if (hbm_en) {
-		comp->funcs->io_cmd(comp, cmdq_handle, OPLUS_TEMP_COMPENSATION_SET, &setting_mode);
+		oplus_temp_compensation_io_cmd_set(comp, cmdq_handle, OPLUS_TEMP_COMPENSATION_FOD_ON_SETTING);
 	} else {
-		setting_mode = OPLUS_TEMP_COMPENSATION_FOD_OFF_SETTING;
-		comp->funcs->io_cmd(comp, cmdq_handle, OPLUS_TEMP_COMPENSATION_SET, &setting_mode);
+		oplus_temp_compensation_io_cmd_set(comp, cmdq_handle, OPLUS_TEMP_COMPENSATION_FOD_OFF_SETTING);
 	}
 	mtk_drm_trace_end();
+#endif /* OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION */
 
 	mtk_drm_trace_begin("mtk_drm_send_lcm_cmd_flush");
 	mtk_drm_send_lcm_cmd_flush(crtc, &cmdq_handle, true);
@@ -1310,7 +1312,6 @@ ssize_t oplus_ofp_notify_fp_press_attr(struct kobject *obj, struct kobj_attribut
 
 int oplus_ofp_drm_set_hbm(struct drm_crtc *crtc, unsigned int hbm_mode)
 {
-	unsigned int setting_mode = OPLUS_TEMP_COMPENSATION_FOD_ON_SETTING;
 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
 	struct cmdq_pkt *cmdq_handle;
 	struct mtk_ddp_comp *comp = mtk_ddp_comp_request_output(mtk_crtc);
@@ -1339,16 +1340,17 @@ int oplus_ofp_drm_set_hbm(struct drm_crtc *crtc, unsigned int hbm_mode)
 		OFP_INFO("LCM_HBM\n");
 		mtk_drm_trace_end();
 
+#ifdef OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
 		/* set temp compensation paras */
 		mtk_drm_trace_begin("OPLUS_TEMP_COMPENSATION_SET");
 		if (hbm_mode) {
-			comp->funcs->io_cmd(comp, cmdq_handle, OPLUS_TEMP_COMPENSATION_SET, &setting_mode);
+			oplus_temp_compensation_io_cmd_set(comp, cmdq_handle, OPLUS_TEMP_COMPENSATION_FOD_ON_SETTING);
 		} else {
-			setting_mode = OPLUS_TEMP_COMPENSATION_FOD_OFF_SETTING;
-			comp->funcs->io_cmd(comp, cmdq_handle, OPLUS_TEMP_COMPENSATION_SET, &setting_mode);
+			oplus_temp_compensation_io_cmd_set(comp, cmdq_handle, OPLUS_TEMP_COMPENSATION_FOD_OFF_SETTING);
 		}
 		mtk_drm_trace_end();
 	}
+#endif /* OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION */
 
 	mtk_drm_trace_begin("mtk_drm_send_lcm_cmd_flush");
 	mtk_drm_send_lcm_cmd_flush(crtc, &cmdq_handle, 0);

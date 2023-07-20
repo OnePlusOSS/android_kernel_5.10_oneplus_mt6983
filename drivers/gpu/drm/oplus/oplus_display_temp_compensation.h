@@ -58,9 +58,12 @@ enum oplus_temp_compensation_temp_index {
 };
 
 enum oplus_temp_compensation_setting_mode {
-	OPLUS_TEMP_COMPENSATION_NORMAL_SETTING = 0,					/* default compensation setting */
-	OPLUS_TEMP_COMPENSATION_FOD_ON_SETTING = 1,					/* set hbm compensation setting */
-	OPLUS_TEMP_COMPENSATION_FOD_OFF_SETTING = 2,				/* recover to normal backlight compensation setting */
+	OPLUS_TEMP_COMPENSATION_BACKLIGHT_SETTING = 0,				/* backlight compensation setting */
+	OPLUS_TEMP_COMPENSATION_TEMPERATURE_SETTING = 1,			/* temperature compensation setting */
+	OPLUS_TEMP_COMPENSATION_FOD_ON_SETTING = 2,					/* set hbm compensation setting */
+	OPLUS_TEMP_COMPENSATION_FOD_OFF_SETTING = 3,				/* recover to normal backlight compensation setting */
+	OPLUS_TEMP_COMPENSATION_ESD_SETTING = 4,					/* force to set compensation setting after esd recovery */
+	OPLUS_TEMP_COMPENSATION_FIRST_HALF_FRAME_SETTING = 5,		/* force to set compensation setting in the first half frame */
 };
 
 /* remember to initialize params */
@@ -70,6 +73,7 @@ struct oplus_temp_compensation_params {
 	int shell_temp;
 	bool fake_ntc_temp;
 	bool fake_shell_temp;
+	bool need_to_set_in_first_half_frame;
 };
 
 /* log level config */
@@ -105,7 +109,11 @@ extern int oplus_dsi_log_type;
 
 /* -------------------- function implementation -------------------- */
 int oplus_temp_compensation_register_ntc_channel(void *device);
+int oplus_temp_compensation_get_ntc_temp(void);
+int oplus_temp_compensation_data_update(void);
 int oplus_temp_compensation_cmd_set(void *dsi, void *p_dcs_write_gce_pack, void *handle, unsigned int setting_mode);
+int oplus_temp_compensation_first_half_frame_cmd_set(void *drm_crtc);
+int oplus_temp_compensation_io_cmd_set(void *mtk_ddp_comp, void *cmdq_pkt, unsigned int setting_mode);
 int oplus_temp_compensation_temp_check(void *mtk_ddp_comp, void *cmdq_pkt);
 
 /* -------------------- node -------------------- */

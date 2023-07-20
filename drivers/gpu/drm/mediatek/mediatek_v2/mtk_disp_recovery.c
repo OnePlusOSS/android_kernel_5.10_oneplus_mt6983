@@ -35,9 +35,9 @@
 #include "mtk_drm_mmp.h"
 #include "mtk_drm_trace.h"
 
-//#ifdef OPLUS_FEATURE_DISPLAY
+#ifdef OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
 #include "oplus_display_temp_compensation.h"
-//#endif /* OPLUS_FEATURE_DISPLAY */
+#endif /* OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION */
 
 #define ESD_TRY_CNT 5
 //#ifndef OPLUS_FEATURE_ESD
@@ -256,9 +256,9 @@ int _mtk_esd_check_read(struct drm_crtc *crtc)
 				     mtk_crtc->gce_obj.event[EVENT_CABC_EOF]);
 		//#endif
 
-//#ifdef OPLUS_FEATURE_DISPLAY
+#ifdef OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
 		oplus_temp_compensation_temp_check(output_comp, cmdq_handle);
-//#endif /* OPLUS_FEATURE_DISPLAY */
+#endif /* OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION */
 
 		mtk_ddp_comp_io_cmd(output_comp, cmdq_handle, ESD_CHECK_READ,
 				    (void *)mtk_crtc);
@@ -435,7 +435,7 @@ static int mtk_drm_request_eint(struct drm_crtc *crtc)
 	struct device_node *node;
 	u32 ints[2] = {0, 0};
 	char *compat_str = NULL;
-	int ret = 0;
+	int ret = 0, retry = 5;
 
 	if (unlikely(!esd_ctx)) {
 		DDPPR_ERR("%s:invalid ESD context\n", __func__);
@@ -469,10 +469,15 @@ static int mtk_drm_request_eint(struct drm_crtc *crtc)
 	of_property_read_u32_array(node, "debounce", ints, ARRAY_SIZE(ints));
 	esd_ctx->eint_irq = irq_of_parse_and_map(node, 0);
 
-	ret = request_irq(esd_ctx->eint_irq, _esd_check_ext_te_irq_handler,
-			  IRQF_TRIGGER_RISING, "ESD_TE-eint", esd_ctx);
-	if (ret) {
+	while((ret = request_irq(esd_ctx->eint_irq, _esd_check_ext_te_irq_handler,
+			  IRQF_TRIGGER_RISING, "ESD_TE-eint", esd_ctx)) && retry)
+	{
 		DDPPR_ERR("eint irq line %u not available! %d\n", esd_ctx->eint_irq, ret);
+		retry--;
+		msleep(5);
+	}
+	if (ret) {
+		DDPPR_ERR("irq not available! %d\n", ret);
 		return ret;
 	}
 
@@ -679,8 +684,8 @@ static int mtk_drm_esd_check_worker_kthread(void *data)
 	unsigned int crtc_idx;
 
 //#ifdef OPLUS_FEATURE_DISPLAY
-		struct mtk_ddp_comp *comp = NULL;
-		bool is_doze_mode = false;
+	struct mtk_ddp_comp *comp = NULL;
+	bool is_doze_mode = false;
 //#endif
 
 	sched_setscheduler(current, SCHED_RR, &param);
@@ -711,26 +716,26 @@ static int mtk_drm_esd_check_worker_kthread(void *data)
 //#endif
 		msleep(ESD_CHECK_PERIOD);
 		if (!panel_is_aries()) {
-			//#ifndef OPLUS_FEATURE_ESD
+//#ifndef OPLUS_FEATURE_ESD
 			/*ret = wait_event_interruptible(
 				esd_ctx->check_task_wq,
 				atomic_read(&esd_ctx->check_wakeup) &&
 				(atomic_read(&esd_ctx->target_time) ||
 				(panel_ext->params->cust_esd_check == 0) &&
 				 (esd_ctx->chk_mode == READ_EINT)));*/
-			//#else
+//#else
 			ret = wait_event_interruptible_timeout(
 				esd_ctx->check_task_wq,
 				atomic_read(&esd_ctx->check_wakeup) &&
 				(atomic_read(&esd_ctx->target_time) ||
 					esd_ctx->chk_mode == READ_EINT), msecs_to_jiffies(TIMEOUT_MS));
-			//#endif
+//#endif
 
-			//#ifndef OPLUS_BUG_STABILITY
+//#ifndef OPLUS_BUG_STABILITY
 			//if (ret < 0) {
-			//#else
+//#else
 			if (ret < 0 || (ffl_backlight_backup == 0 || ffl_backlight_backup == 1)){
-			//#endif
+//#endif
 				DDPINFO("[ESD]check thread waked up accidently\n");
 				continue;
 			}
@@ -761,6 +766,9 @@ static int mtk_drm_esd_check_worker_kthread(void *data)
 
 		te_timeout = false;
 		if (check_te == true) {
+#ifdef OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
+			oplus_temp_compensation_data_update();
+#endif /* OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION */
 			ret = wait_event_interruptible(
 				esd_ctx->check_task_wq,
 				atomic_read(&esd_ctx->check_wakeup));
@@ -782,9 +790,9 @@ static int mtk_drm_esd_check_worker_kthread(void *data)
 					__func__, HZ, ret,
 					atomic_read(&esd_ctx->check_wakeup));
 				te_timeout = true;
-		//#ifndef OPLUS_BUG_STABILITY
+//#ifndef OPLUS_BUG_STABILITY
 				esd_flag = 1;
-		//#endif
+//#endif
 				DDPMSG("%s, stop cancel all gce jobs\n", __func__);
 				if (mtk_crtc->gce_obj.client[CLIENT_CFG])
 					cmdq_mbox_stop(mtk_crtc->gce_obj.client[CLIENT_CFG]);
@@ -817,13 +825,13 @@ static int mtk_drm_esd_check_worker_kthread(void *data)
 			}
 		}
 
-		/* #ifdef OPLUS_FEATURE_DISPLAY */
+/* #ifdef OPLUS_FEATURE_DISPLAY */
 		if (atomic_read(&esd_ctx->target_flag)) {
 			DDPDBG("[ESD] %d, target_flag:%d\n", __LINE__,atomic_read(&esd_ctx->target_flag));
 			msleep(ESD_CHECK_PERIOD/2);
 			atomic_set(&esd_ctx->target_flag, 0);
 			DDPDBG("[ESD] %d, target_flag:%d\n", __LINE__,atomic_read(&esd_ctx->target_flag));
-			//#ifdef OPLUS_FEATURE_DISPLAY
+//#ifdef OPLUS_FEATURE_DISPLAY
 			if (mtk_crtc && mtk_crtc->panel_ext && mtk_crtc->panel_ext->params &&
 					mtk_crtc->panel_ext->params->esd_check_aod_status_again_skip == 1) {
 				if (crtc->state && crtc->state->enable) {
@@ -835,9 +843,13 @@ static int mtk_drm_esd_check_worker_kthread(void *data)
 					}
 				}
 			}
-			//#endif
+//#endif
 		}
-		/* #endif */
+/* #endif */
+
+#ifdef OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
+		oplus_temp_compensation_get_ntc_temp();
+#endif /* OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION */
 
 		mutex_lock(&private->commit.lock);
 		DDP_MUTEX_LOCK(&mtk_crtc->lock, __func__, __LINE__);
@@ -857,14 +869,14 @@ static int mtk_drm_esd_check_worker_kthread(void *data)
 		do {
 			if (te_timeout == false || i > 0) {
 				ret = mtk_drm_esd_check(crtc);
-				//#ifndef OPLUS_FEATURE_ESD
+//#ifndef OPLUS_FEATURE_ESD
 				//if (!ret) /* success */
 					//break;
-				//#else
+//#else
 				if (!esd_mode && !ret) /* success */
 					break;
 				esd_flag = 1;
-				//#endif
+//#endif
 			}
 			DDPPR_ERR(
 				"[ESD%u]esd check fail, will do esd recovery. te timeout:%d try=%d\n",

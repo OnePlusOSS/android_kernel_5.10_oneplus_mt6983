@@ -612,6 +612,7 @@ initcall_debug=1 ";
 		black_gesture_indep_support;
 		algorithm_support;
 		snr_read_support;
+		exception_upload_support;
 		/*
 		 *Virtual Key Config:
 		 *1:touchpanel,button-type: <virtualkey_type  supportted_button-map>

@@ -39,6 +39,11 @@ static DEFINE_MUTEX(desc_lock);
 #define KB_BUTTON_ID 0x03
 #define KB_TOUCHPAD_ID 0x04
 
+#define KB_SN_HIDE_BIT_START  2
+#define KB_SN_HIDE_SEVENTEEN_END  9
+#define KB_SN_HIDE_TWENTY_TWO_END 14
+#define KB_SN_HIDE_STAR_ASCII  42
+
 #define i2c_hid_err(ihid, fmt, arg...)					  \
 do {									  \
 	dev_printk(KERN_ERR, &(ihid)->client->dev, fmt, ##arg); \
@@ -411,7 +416,9 @@ static void i2c_hid_get_input(struct i2c_hid *ihid)
 	static int point_count = 0;
 	int size = le16_to_cpu(ihid->hdesc.wMaxInputLength);
 	u8 keyboard_brand;
-	u8 mask = KEYBOARD_BRAND_MASK;
+	u8 touch_status;
+	u8 brand_mask = KEYBOARD_BRAND_MASK;
+	u8 touch_mask = KEYBOARD_TOUCH_MASK;
 
 	if (size > ihid->bufsize)
 		size = ihid->bufsize;
@@ -454,9 +461,12 @@ static void i2c_hid_get_input(struct i2c_hid *ihid)
 
 	if (ihid->inbuf[2] == KB_CON_PAC_ID) {
 		if (ihid->inbuf[3] & 0x1) {
+			/* bit6: touch status, 0:enabled 1:disabled */
+			touch_status = (ihid->inbuf[3] & touch_mask) >> KEYBOARD_TOUCH_BIT;
+			fw_ihid->keyboard_touch_status = touch_status;
 			if (!kb_connected) {
 				if(fw_ihid) {
-					keyboard_brand = (ihid->inbuf[3] & mask) >> KEYBOARD_BRAND_SHIFT;
+					keyboard_brand = (ihid->inbuf[3] & brand_mask) >> KEYBOARD_BRAND_SHIFT;
 					if(keyboard_brand == KEYBOARD_BRAND_ONEPLUE) {
 						fw_ihid->is_oneplus_keyboard_or_not = true;
 						fw_ihid->kpdmcu_fw_data_ver = ihid->kpdmcu_fw_data_version[1];
@@ -481,11 +491,11 @@ static void i2c_hid_get_input(struct i2c_hid *ihid)
 					return;
 				} else {
 					kb_connected = true;
-					dev_info(&ihid->client->dev, "%s:keyboard detected,register input dev success\n", __func__);
+					dev_info(&ihid->client->dev, "%s:keyboard detected,register input dev success. touch status [%u]\n", __func__, touch_status);
 					schedule_work(&ihid->kpdmcu_fw_mcu_version_work);
 				}
 			} else {
-				dev_info(&ihid->client->dev, "%s: keyboard detected again\n", __func__);
+				dev_info(&ihid->client->dev, "%s: keyboard detected again. touch status [%u]\n", __func__, touch_status);
 			}
 		} else {
 			if (kb_connected) {
@@ -1235,6 +1245,23 @@ static const struct proc_ops proc_padmcu_fw_ops = {
 	.proc_write = proc_padmcu_fw_write,
 };
 
+static ssize_t proc_kbd_touch_status_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
+{
+	struct i2c_hid *ihid = PDE_DATA(file_inode(file));
+	uint8_t ret = 0;
+	char page[PROC_PAGE_LEN] = {0};
+
+	snprintf(page, PROC_PAGE_LEN - 1, "%u", ihid->keyboard_touch_status);
+
+	ret = simple_read_from_buffer(buf, count, ppos, page, strlen(page));
+
+	return ret;
+}
+
+static const struct proc_ops proc_kbd_touch_status_ops = {
+	.proc_read = proc_kbd_touch_status_read,
+};
+
 const struct firmware *get_fw_firmware(struct i2c_hid *ihid, const char *patch)
 {
 	struct i2c_client *client = ihid->client;
@@ -1887,6 +1914,12 @@ static void init_i2c_hid_proc(struct i2c_hid *ihid)
 		prEntry_tmp = proc_create_data("kpdmcu_sn", 0644, prEntry_pogopin, &proc_kpdmcu_sn_ops, ihid);
 		if (prEntry_tmp == NULL) {
 			i2c_hid_err(ihid, "%s: create kpdmcu_sn proc entry failed.\n", __func__);
+		}
+
+
+		prEntry_tmp = proc_create_data("kbd_touch_status", 0644, prEntry_pogopin, &proc_kbd_touch_status_ops, ihid);
+		if (prEntry_tmp == NULL) {
+			i2c_hid_err(ihid, "%s: create kbd_touch_status proc entry failed.\n", __func__);
 		}
 	}
 
@@ -2963,7 +2996,9 @@ static int kpdmcu_sn_feedback(struct i2c_hid *ihid)
 	u8 send_mask_cmd[1] = {0x5a};
 	int ret;
 	int i;
+	int sn_hide_bit_end = 0;
 	int index = 0;
+	int sn_length = 0;
 	char report[MAX_POGOPIN_PAYLOAD_LEN];
 
 	msleep(POGOPIN_GET_SN_MS);
@@ -2986,6 +3021,21 @@ static int kpdmcu_sn_feedback(struct i2c_hid *ihid)
 		return 0;
 	}
 	index += snprintf(&report[index], MAX_POGOPIN_PAYLOAD_LEN - index, "$$sn@@");
+
+	for(i = 0; i < DEFAULT_SN_LEN; i++) {
+		if(recv_buf[i] != 0)
+			sn_length++;
+	}
+
+	if (DEFAULT_SN_LEN == sn_length) {
+		sn_hide_bit_end = KB_SN_HIDE_TWENTY_TWO_END;
+	} else {
+		sn_hide_bit_end = KB_SN_HIDE_SEVENTEEN_END;
+	}
+
+	for(i = KB_SN_HIDE_BIT_START; i < sn_hide_bit_end; i++)
+			recv_buf[i] = KB_SN_HIDE_STAR_ASCII;
+
 	for(i = 1; i < DEFAULT_SN_LEN; i++) {
 		ihid->report_sn[i - 1] = recv_buf[i];
 		index += snprintf(&report[index], MAX_POGOPIN_PAYLOAD_LEN - index, "%c", ihid->report_sn[i - 1]);

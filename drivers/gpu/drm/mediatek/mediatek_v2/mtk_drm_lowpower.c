@@ -17,6 +17,7 @@
 #include "mtk_drm_drv.h"
 #include "mtk_drm_ddp.h"
 #include "mtk_drm_ddp_comp.h"
+#include "mtk_fence.h"
 #include "mtk_drm_mmp.h"
 #include "mtk_drm_trace.h"
 
@@ -369,6 +370,33 @@ static int mtk_drm_async_kick_idlemgr_thread(void *data)
 	return 0;
 }
 
+static int mtk_drm_check_pending_layer_fence(struct mtk_drm_crtc *mtk_crtc)
+{
+	struct drm_crtc *crtc = &mtk_crtc->base;
+	int session_id;
+	unsigned int i;
+
+	session_id = mtk_get_session_id(crtc);
+
+	for (i = 0; i < mtk_crtc->layer_nr; ++i) {
+		unsigned int subtractor, fence_idx, current_idx;
+
+		fence_idx = *(unsigned int *)
+			mtk_get_gce_backup_slot_va(mtk_crtc,
+			DISP_SLOT_CUR_CONFIG_FENCE(mtk_get_plane_slot_idx(mtk_crtc, i)));
+		subtractor = *(unsigned int *)
+			mtk_get_gce_backup_slot_va(mtk_crtc,
+			DISP_SLOT_SUBTRACTOR_WHEN_FREE(mtk_get_plane_slot_idx(mtk_crtc, i)));
+		subtractor &= 0xFFFF;
+		current_idx = mtk_fence_curr_idx(session_id, i);
+
+		if ((fence_idx - subtractor) - current_idx >= 2)
+			return 1;
+	}
+
+	return 0;
+}
+
 static int mtk_drm_idlemgr_monitor_thread(void *data)
 {
 	int ret = 0;
@@ -403,6 +431,12 @@ static int mtk_drm_idlemgr_monitor_thread(void *data)
 		if (mtk_crtc_is_frame_trigger_mode(crtc) &&
 				atomic_read(&priv->crtc_rel_present[crtc_id]) <
 				atomic_read(&priv->crtc_present[crtc_id])) {
+			DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
+			continue;
+		}
+
+		if (mtk_crtc_is_frame_trigger_mode(crtc) &&
+				mtk_drm_check_pending_layer_fence(mtk_crtc)) {
 			DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
 			continue;
 		}
@@ -720,7 +754,6 @@ static void mtk_drm_idlemgr_enable_crtc(struct drm_crtc *crtc)
 	}
 
 	/* 4. prepare modules would be used in this CRTC */
-
 	mtk_crtc_ddp_prepare(mtk_crtc);
 
 	//mtk_gce_backup_slot_init(mtk_crtc);

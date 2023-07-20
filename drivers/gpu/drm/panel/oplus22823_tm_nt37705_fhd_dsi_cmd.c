@@ -36,10 +36,14 @@
 //#include "../mediatek/mediatek_v2/mtk_corner_pattern/mtk_data_hw_roundedpattern.h"
 #include "oplus22823_tm_nt37705_fhd_dsi_cmd.h"
 #include "../oplus/oplus_drm_disp_panel.h"
-#include "../oplus/oplus_display_temp_compensation.h"
 //#ifdef OPLUS_FEATURE_DISPLAY_ADFR
 #include "../oplus/oplus_adfr_ext.h"
 //#endif
+
+#ifdef OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
+#include "../oplus/oplus_display_temp_compensation.h"
+#endif /* OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION */
+
 /* add for ofp */
 #include "../oplus/oplus_display_onscreenfingerprint.h"
 /* #endif */ /* OPLUS_FEATURE_ONSCREENFINGERPRINT */
@@ -648,6 +652,13 @@ static int lcm_unprepare(struct drm_panel *panel)
 				push_table(ctx, aod_off_cmd_hpwm_60hz, sizeof(aod_off_cmd_hpwm_60hz) / sizeof(struct LCM_setting_table));
 			} else {
 				push_table(ctx, aod_off_cmd_hpwm_120hz, sizeof(aod_off_cmd_hpwm_120hz) / sizeof(struct LCM_setting_table));
+			}
+			if (oplus_display_brightness <= 0x643) {
+				DISP_INFO("pwm_turbo dsi_high_12plus backlight level=%d\n", oplus_display_brightness);
+				push_table(ctx, dsi_high_12plus, sizeof(dsi_high_12plus) / sizeof(struct LCM_setting_table));
+			} else if (oplus_display_brightness > 0x643) {
+				DISP_INFO("pwm_turbo dsi_low_3plus backlight level=%d\n", oplus_display_brightness);
+				push_table(ctx, dsi_low_3plus, sizeof(dsi_low_3plus) / sizeof(struct LCM_setting_table));
 			}
 		} else {
 			if (vrefresh_rate == 60) {
@@ -1321,22 +1332,24 @@ static int oplus_display_panel_set_pwm_fps(void *dsi, dcs_write_gce_pack cb, voi
 
 	if (get_pwm_status(en_h_pwm)) {
 		if (fps == 60) {
+			cmdq_pkt_sleep(handle, CMDQ_US_TO_TICK(300), CMDQ_GPR_R06);
 			panel_send_pack_hs_cmd(dsi, timing_switch_cmd_high_pwm_sdc60_part1, sizeof(timing_switch_cmd_high_pwm_sdc60_part1) / sizeof(struct LCM_setting_table), cb, handle);
-			usleep_range(12000, 12100);
+			cmdq_pkt_sleep(handle, CMDQ_US_TO_TICK(8500), CMDQ_GPR_R06);
 			panel_send_pack_hs_cmd(dsi, timing_switch_cmd_high_pwm_sdc60, sizeof(timing_switch_cmd_high_pwm_sdc60) / sizeof(struct LCM_setting_table), cb, handle);
 		} else {
 			panel_send_pack_hs_cmd(dsi, timing_switch_cmd_high_pwm_sdc120_part1, sizeof(timing_switch_cmd_high_pwm_sdc120_part1) / sizeof(struct LCM_setting_table), cb, handle);
-			usleep_range(12000, 12100);
+			cmdq_pkt_sleep(handle, CMDQ_US_TO_TICK(8500), CMDQ_GPR_R06);
 			panel_send_pack_hs_cmd(dsi, timing_switch_cmd_high_pwm_sdc120, sizeof(timing_switch_cmd_high_pwm_sdc120) / sizeof(struct LCM_setting_table), cb, handle);
 		}
 	} else {
 		if (fps == 60) {
+			cmdq_pkt_sleep(handle, CMDQ_US_TO_TICK(300), CMDQ_GPR_R06);
 			panel_send_pack_hs_cmd(dsi, timing_switch_cmd_sdc60_part1, sizeof(timing_switch_cmd_sdc60_part1) / sizeof(struct LCM_setting_table), cb, handle);
-			usleep_range(12000, 12100);
+			cmdq_pkt_sleep(handle, CMDQ_US_TO_TICK(8500), CMDQ_GPR_R06);
 			panel_send_pack_hs_cmd(dsi, timing_switch_cmd_sdc60, sizeof(timing_switch_cmd_sdc60) / sizeof(struct LCM_setting_table), cb, handle);
 		} else {
 			panel_send_pack_hs_cmd(dsi, timing_switch_cmd_sdc120_part1, sizeof(timing_switch_cmd_sdc120_part1) / sizeof(struct LCM_setting_table), cb, handle);
-			usleep_range(12000, 12100);
+			cmdq_pkt_sleep(handle, CMDQ_US_TO_TICK(8500), CMDQ_GPR_R06);
 			panel_send_pack_hs_cmd(dsi, timing_switch_cmd_sdc120, sizeof(timing_switch_cmd_sdc120) / sizeof(struct LCM_setting_table), cb, handle);
 		}
 	}
@@ -1357,28 +1370,6 @@ static int oplus_display_panel_set_pwm_plus_bl(void *dsi, dcs_write_gce_pack cb,
 		DISP_INFO("pwm_turbo dsi_low_3plus_bl backlight level=%d, bl_record=%d\n", bl_lvl, bl_record);
 		panel_send_pack_hs_cmd(dsi, dsi_low_3plus_bl, sizeof(dsi_low_3plus_bl) / sizeof(struct LCM_setting_table), cb, handle);
 	}
-	return 0;
-}
-
-
-static int oplus_temp_compensation_set(void *dsi, dcs_write_gce_pack cb, void *handle, unsigned int setting_mode)
-{
-	int rc = 0;
-
-	TEMP_COMPENSATION_DEBUG("start\n");
-
-	if (!dsi || !cb) {
-		TEMP_COMPENSATION_ERR("Invalid params\n");
-		return -EINVAL;
-	}
-
-	rc = oplus_temp_compensation_cmd_set(dsi, cb, handle, setting_mode);
-	if (rc) {
-		TEMP_COMPENSATION_ERR("failed to set temp compensation cmd, rc=%d\n", rc);
-	}
-
-	TEMP_COMPENSATION_DEBUG("end\n");
-
 	return 0;
 }
 
@@ -1490,10 +1481,12 @@ static int lcm_set_hbm(void *dsi, dcs_write_gce cb,
 		for (i = 0; i < sizeof(hbm_off_cmd_60hz)/sizeof(struct LCM_setting_table); i++) {
 			cb(dsi, handle, hbm_off_cmd_60hz[i].para_list, hbm_off_cmd_60hz[i].count);
 		}
-		if (get_pwm_status(g_pwm_en)) {
-			pwm_power_on = true;
-		}
 		lcm_setbacklight_cmdq(dsi, cb, handle, oplus_display_brightness);
+
+		if ((get_pwm_status(g_pwm_en)) && (oplus_display_brightness != 1)) {
+			pwm_power_on = true;
+			oplus_display_panel_set_frequency_pwm(dsi, cb, handle, oplus_display_brightness);
+		}
 	}
 
 	OFP_DEBUG("end\n");
@@ -1583,10 +1576,12 @@ static int panel_hbm_set_cmdq(struct drm_panel *panel, void *dsi,
 	}
 
 	if (!en) {
-		if (get_pwm_status(g_pwm_en)) {
-			pwm_power_on = true;
-		}
 		lcm_setbacklight_cmdq(dsi, cb, handle, oplus_display_brightness);
+
+		if ((get_pwm_status(g_pwm_en)) && (oplus_display_brightness != 1)) {
+			pwm_power_on = true;
+			oplus_display_panel_set_frequency_pwm(dsi, cb, handle, oplus_display_brightness);
+		}
 	}
 
 	lcdinfo_notify(1, &en);
@@ -1668,6 +1663,10 @@ static int panel_doze_disable(struct drm_panel *panel, void *dsi, dcs_write_gce 
 	}
 
 	lcm_setbacklight_cmdq(dsi, cb, handle, last_backlight);
+	if (get_pwm_status(g_pwm_en)) {
+		pwm_power_on = true;
+		oplus_display_panel_set_frequency_pwm(dsi, cb, handle, oplus_display_brightness);
+	}
 
 	OFP_INFO("send aod off cmd\n");
 
@@ -1933,47 +1932,47 @@ static int panel_minfps_check(int mode_id, int extend_frame)
 	return extend_frame;
 }
 
-static int panel_set_minfps(void *dsi, struct drm_panel *panel, dcs_write_gce_pack cb, void *handle, 
+static int panel_set_minfps(void *dsi, struct drm_panel *panel, dcs_write_gce_pack cb, void *handle,
 	void *minfps, struct drm_display_mode *m)
 {
-	struct oplus_minfps *min_fps = (struct oplus_minfps *)minfps;
+	unsigned int mode_id = 0;
+	unsigned int vrefresh_rate = 0;
+	unsigned int ext_frame = 0;
 	unsigned int lcm_cmd_count = 0;
-	int mode_id = 0;
-	int ext_frame = 0;
-	int m_vrefresh = 0;
+	struct oplus_minfps *min_fps = (struct oplus_minfps *)minfps;
 
-	if ((m == NULL) || (minfps == NULL)) {
-		ADFR_WARN("panel_set_minfps, mode or minfps is NULL\n");
+	if (!dsi || !cb || !minfps || !m) {
+		ADFR_ERR("Invalid params\n");
 		return -EINVAL;
 	}
 
-	m_vrefresh = drm_mode_vrefresh(m);
 	mode_id = get_mode_enum(m);
-	ADFR_INFO("minfps_flag:%d,extern_frame:%d,mode_id:%d\n",
-		min_fps->minfps_flag, min_fps->extend_frame, mode_id);
+	vrefresh_rate = drm_mode_vrefresh(m);
+	ADFR_INFO("mode_id:%u,refresh_rate:%u,minfps_flag:%u,extern_frame:%u\n",
+				mode_id, vrefresh_rate, min_fps->minfps_flag, min_fps->extend_frame);
 
-	/*update the sdc min fps cmds */
-	if (min_fps->minfps_flag == 0) {
+	/* update min fps cmd */
+	if (!min_fps->minfps_flag) {
 		/* update manual min fps */
 		ext_frame = panel_minfps_check(mode_id, min_fps->extend_frame);
 		if (get_pwm_status(g_pwm_en)) {
-			if (m_vrefresh != 90) {
-				auto_off_minfps_hpwm_cmd[SDC_MANUAL_MIN_FPS_CMD_OFFSET].para_list[1] = ext_frame;
-				lcm_cmd_count = sizeof(auto_off_minfps_hpwm_cmd) / sizeof(struct LCM_setting_table);
-				ADFR_INFO("auto_off_minfps_hpwm_cmd,ext_frame=%d\n", ext_frame);
-				panel_send_pack_hs_cmd(dsi, auto_off_minfps_hpwm_cmd, lcm_cmd_count, cb, handle);
+			if (vrefresh_rate != 90) {
+				auto_off_minfps_cmd_hpwm_120hz[SDC_MANUAL_MIN_FPS_CMD_OFFSET].para_list[1] = ext_frame;
+				lcm_cmd_count = sizeof(auto_off_minfps_cmd_hpwm_120hz) / sizeof(struct LCM_setting_table);
+				ADFR_INFO("auto_off_minfps_cmd_hpwm_120hz,ext_frame:%u\n", ext_frame);
+				panel_send_pack_hs_cmd(dsi, auto_off_minfps_cmd_hpwm_120hz, lcm_cmd_count, cb, handle);
 			}
 		} else {
-			if (m_vrefresh != 90) {
-				auto_off_minfps_cmd[SDC_MANUAL_MIN_FPS_CMD_OFFSET].para_list[1] = ext_frame;
-				lcm_cmd_count = sizeof(auto_off_minfps_cmd) / sizeof(struct LCM_setting_table);
-				ADFR_INFO("auto_off_minfps_cmd,ext_frame=%d\n", ext_frame);
-				panel_send_pack_hs_cmd(dsi, auto_off_minfps_cmd, lcm_cmd_count, cb, handle);
+			if (vrefresh_rate != 90) {
+				auto_off_minfps_cmd_lpwm_120hz[SDC_MANUAL_MIN_FPS_CMD_OFFSET].para_list[1] = ext_frame;
+				lcm_cmd_count = sizeof(auto_off_minfps_cmd_lpwm_120hz) / sizeof(struct LCM_setting_table);
+				ADFR_INFO("auto_off_minfps_cmd_lpwm_120hz,ext_frame:%u\n", ext_frame);
+				panel_send_pack_hs_cmd(dsi, auto_off_minfps_cmd_lpwm_120hz, lcm_cmd_count, cb, handle);
 			} else {
-				auto_off_minfps_cmd_90hz[SDC_MANUAL_MIN_FPS_CMD_OFFSET].para_list[1] = ext_frame;
-				lcm_cmd_count = sizeof(auto_off_minfps_cmd_90hz) / sizeof(struct LCM_setting_table);
-				ADFR_INFO("auto_off_minfps_cmd_90hz,ext_frame=%d\n", ext_frame);
-				panel_send_pack_hs_cmd(dsi, auto_off_minfps_cmd_90hz, lcm_cmd_count, cb, handle);
+				auto_off_minfps_cmd_lpwm_90hz[SDC_MANUAL_MIN_FPS_CMD_OFFSET].para_list[1] = ext_frame;
+				lcm_cmd_count = sizeof(auto_off_minfps_cmd_lpwm_90hz) / sizeof(struct LCM_setting_table);
+				ADFR_INFO("auto_off_minfps_cmd_lpwm_90hz,ext_frame:%u\n", ext_frame);
+				panel_send_pack_hs_cmd(dsi, auto_off_minfps_cmd_lpwm_90hz, lcm_cmd_count, cb, handle);
 			}
 		}
 	}
@@ -2000,6 +1999,29 @@ static int panel_set_multite(void *dsi, struct drm_panel *panel, dcs_write_gce_p
 
 	return 0;
 }
+
+#ifdef OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
+static int oplus_temp_compensation_set(void *dsi, void *gce_cb, void *handle, unsigned int setting_mode)
+{
+	int rc = 0;
+
+	TEMP_COMPENSATION_DEBUG("start\n");
+
+	if (!dsi || !gce_cb) {
+		TEMP_COMPENSATION_ERR("Invalid params\n");
+		return -EINVAL;
+	}
+
+	rc = oplus_temp_compensation_cmd_set(dsi, gce_cb, handle, setting_mode);
+	if (rc) {
+		TEMP_COMPENSATION_ERR("failed to set temp compensation cmd, rc=%d\n", rc);
+	}
+
+	TEMP_COMPENSATION_DEBUG("end\n");
+
+	return 0;
+}
+#endif /* OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION */
 
 static int mode_switch_hs(struct drm_panel *panel, struct drm_connector *connector,
 		void *dsi_drv, unsigned int cur_mode, unsigned int dst_mode,
@@ -2236,6 +2258,9 @@ static struct mtk_panel_funcs ext_funcs = {
 	.mode_switch_hs = mode_switch_hs,
 	.set_minfps = panel_set_minfps,
 	.set_multite = panel_set_multite,
+#ifdef OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
+	.oplus_temp_compensation_set = oplus_temp_compensation_set,
+#endif /* OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION */
 #if 1
 	.set_hbm = lcm_set_hbm,
 	.hbm_set_cmdq = panel_hbm_set_cmdq,
@@ -2249,7 +2274,6 @@ static struct mtk_panel_funcs ext_funcs = {
 	.lcm_high_pwm_elvss = oplus_display_panel_set_elvss,
 	.lcm_high_pwm_set_fps = oplus_display_panel_set_pwm_fps,
 	.lcm_high_pwm_set_plus_bl = oplus_display_panel_set_pwm_plus_bl,
-	.oplus_temp_compensation_set = oplus_temp_compensation_set,
 	/* .esd_check_precondition = lcm_esd_check_precondition, */
 };
 
@@ -2334,13 +2358,15 @@ static int lcm_probe(struct mipi_dsi_device *dsi)
 		return -ENODEV;
 	}
 
-/* #ifdef OPLUS_FEATURE_DISPLAY */
+	usleep_range(1000000, 1000100);
+
+#ifdef OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
 	rc = oplus_temp_compensation_register_ntc_channel(dev);
 	if (rc) {
 		TEMP_COMPENSATION_ERR("failed to register ntc channel\n");
 		return rc;
 	}
-/* #endif */ /* OPLUS_FEATURE_DISPLAY */
+#endif /* OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION */
 
 	ctx = devm_kzalloc(dev, sizeof(struct lcm), GFP_KERNEL);
 	if (!ctx)

@@ -29,4 +29,5 @@ int oplus_display_panel_get_pq_trigger(void *buf);
 int oplus_display_panel_set_pq_trigger(void *buf);
 int oplus_display_panel_set_pwm_status(void *data);
 int oplus_display_panel_get_pwm_status(void *buf);
+int oplus_display_panel_get_pwm_status_for_90hz(void *buf);
 #endif /*_OPLUS_DISPLAY_COMMON_H_*/

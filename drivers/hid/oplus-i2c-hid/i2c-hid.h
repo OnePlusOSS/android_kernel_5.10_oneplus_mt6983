@@ -114,7 +114,7 @@ union command {
 #define MAX_POGOPIN_EVENT_TAG_LEN   32
 #define MAX_POGOPIN_EVENT_ID_LEN    20
 #define MAX_POGOPIN_PAYLOAD_LEN     1024
-#define POGOPIN_GET_SN_MS           500
+#define POGOPIN_GET_SN_MS           100
 
 #define KEYBOARD_FIRMWARE_NUM       2
 #define KEYBOARD_BRAND_MASK         0x30

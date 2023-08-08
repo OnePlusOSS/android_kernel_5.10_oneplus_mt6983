@@ -67,6 +67,12 @@ bool last_full = false;
 #define BAT_TYPE__ATL_4450mV_NTC_MIN 550
 #define BAT_TYPE__ATL_4450mV_NTC_MAX 790
 
+
+#ifdef OPLUS_FEATURE_CHG_BASIC
+#define RM_CHECK_RETRY_TIMES 5
+#define RM_CHECK_DELAY_20S msecs_to_jiffies(20000)
+#endif
+
 enum {
 	BAT_TYPE__UNKNOWN,
 	BAT_TYPE__SDI_4350mV, //50mV~290mV
@@ -3091,6 +3097,19 @@ void fg_drv_thread_hrtimer_init(struct mtk_battery *gm)
 	hrtimer_start(&gm->fg_hrtimer, ktime, HRTIMER_MODE_REL);
 }
 
+#ifdef OPLUS_FEATURE_CHG_BASIC
+void oplus_startup_rm_check_work_handler(struct work_struct *data)
+{
+	static int retry_times = 0;
+
+	if ((oplus_gm->prev_batt_remaining_capacity == 0) && (retry_times++ < RM_CHECK_RETRY_TIMES))
+	{
+		wakeup_fg_algo(oplus_gm, FG_INTR_IAVG);
+		schedule_delayed_work(&oplus_gm->oplus_startup_rm_check_work, RM_CHECK_DELAY_20S);
+	}
+}
+#endif
+
 /* ============================================================ */
 /* alarm timer handler */
 /* ============================================================ */
@@ -4149,6 +4168,8 @@ int battery_init(struct platform_device *pdev)
 #ifdef OPLUS_FEATURE_CHG_BASIC
 	oplus_gm = gm;
 	printk(KERN_ERR "!!!!! oplus_gm is ready\n");
+	INIT_DELAYED_WORK(&oplus_gm->oplus_startup_rm_check_work, oplus_startup_rm_check_work_handler);
+	schedule_delayed_work(&oplus_gm->oplus_startup_rm_check_work, RM_CHECK_DELAY_20S);
 #endif
 
 	if (ret == 0 && b_recovery_mode == 0)

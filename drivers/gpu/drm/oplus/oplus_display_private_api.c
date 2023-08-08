@@ -162,7 +162,7 @@ static ssize_t oplus_display_set_brightness(struct kobject *obj,
 
 	printk("%s %d\n", __func__, oplus_set_brightness);
 
-	if (oplus_set_brightness > OPLUS_MAX_BRIGHTNESS || oplus_set_brightness < OPLUS_MIN_BRIGHTNESS) {
+	if (oplus_set_brightness > OPLUS_MAX_BRIGHTNESS) {
 		printk(KERN_ERR "%s, brightness:%d out of scope\n", __func__, oplus_set_brightness);
 		return num;
 	}
@@ -385,9 +385,11 @@ int panel_serial_number_read(struct drm_crtc *crtc, char cmd, int num)
 	struct mtk_drm_crtc *mtk_crtc;
 
 	mtk_crtc = to_mtk_crtc(crtc);
-	comp = mtk_ddp_comp_request_output(mtk_crtc);
+	if (mtk_crtc) {
+		comp = mtk_ddp_comp_request_output(mtk_crtc);
+	}
 
-	if (!(mtk_crtc->enabled)) {
+	if (mtk_crtc && !(mtk_crtc->enabled)) {
 		pr_err("[lh]Sleep State set backlight stop --crtc not ebable\n");
 		return 0;
 	}
@@ -1301,7 +1303,7 @@ static ssize_t oplus_display_get_osc(struct kobject *kobj,
 {
         printk(KERN_INFO "osc_mode = %d\n", osc_mode);
 
-        return sprintf(buf, "%d\n", osc_mode);
+        return sprintf(buf, "%lu\n", osc_mode);
 }
 
 static ssize_t oplus_display_set_osc(struct kobject *kobj,
@@ -1311,13 +1313,16 @@ static ssize_t oplus_display_set_osc(struct kobject *kobj,
 	unsigned int temp_save = 0;
 	int ret = 0;
 	struct drm_device *ddev = get_drm_device();
-
+	if (!ddev) {
+		printk(KERN_ERR "find ddev fail\n");
+		return 0;
+	}
 	ret = kstrtouint(buf, 10, &temp_save);
 	printk(KERN_INFO "osc mode = %d\n", temp_save);
 
 	crtc = list_first_entry(&(ddev)->mode_config.crtc_list,
 				typeof(*crtc), head);
-	if (!crtc) {
+	if (IS_ERR_OR_NULL(crtc)) {
 		printk(KERN_ERR "find crtc fail\n");
 		return 0;
 	}

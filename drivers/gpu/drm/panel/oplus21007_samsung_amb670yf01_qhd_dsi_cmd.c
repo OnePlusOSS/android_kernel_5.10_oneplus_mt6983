@@ -1688,6 +1688,10 @@ static int lcm_setbacklight_cmdq(void *dsi, dcs_write_gce cb, void *handle,
 
 	if (!cb)
 		return -EINVAL;
+	if (level > HBM_BASE_800NIT) {
+		level = HBM_BASE_800NIT;
+		DISP_ERR("set backlight oversize, change it to max value\n");
+	}
 
 	mapped_level = level;
 	esd_brightness = mapped_level;

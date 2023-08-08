@@ -72,7 +72,7 @@ int oplus_display_set_brightness(void *buf)
 
 	printk("%s %d\n", __func__, oplus_set_brightness);
 
-	if (oplus_set_brightness > OPLUS_MAX_BRIGHTNESS || oplus_set_brightness < OPLUS_MIN_BRIGHTNESS) {
+	if (oplus_set_brightness > OPLUS_MAX_BRIGHTNESS) {
 		printk(KERN_ERR "%s, brightness:%d out of scope\n", __func__, oplus_set_brightness);
 		return -1;
 	}

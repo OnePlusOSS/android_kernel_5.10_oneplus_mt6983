@@ -39,6 +39,11 @@ static DEFINE_MUTEX(desc_lock);
 #define KB_BUTTON_ID 0x03
 #define KB_TOUCHPAD_ID 0x04
 
+#define KB_SN_HIDE_BIT_START  2
+#define KB_SN_HIDE_SEVENTEEN_END  9
+#define KB_SN_HIDE_TWENTY_TWO_END 14
+#define KB_SN_HIDE_STAR_ASCII  42
+
 #define i2c_hid_err(ihid, fmt, arg...)					  \
 do {									  \
 	dev_printk(KERN_ERR, &(ihid)->client->dev, fmt, ##arg); \
@@ -2990,7 +2995,9 @@ static int kpdmcu_sn_feedback(struct i2c_hid *ihid)
 	u8 send_mask_cmd[1] = {0x5a};
 	int ret;
 	int i;
+	int sn_hide_bit_end = 0;
 	int index = 0;
+	int sn_length = 0;
 	char report[MAX_POGOPIN_PAYLOAD_LEN];
 
 	msleep(POGOPIN_GET_SN_MS);
@@ -3013,6 +3020,21 @@ static int kpdmcu_sn_feedback(struct i2c_hid *ihid)
 		return 0;
 	}
 	index += snprintf(&report[index], MAX_POGOPIN_PAYLOAD_LEN - index, "$$sn@@");
+
+	for(i = 0; i < DEFAULT_SN_LEN; i++) {
+		if(recv_buf[i] != 0)
+			sn_length++;
+	}
+
+	if (DEFAULT_SN_LEN == sn_length) {
+		sn_hide_bit_end = KB_SN_HIDE_TWENTY_TWO_END;
+	} else {
+		sn_hide_bit_end = KB_SN_HIDE_SEVENTEEN_END;
+	}
+
+	for(i = KB_SN_HIDE_BIT_START; i < sn_hide_bit_end; i++)
+			recv_buf[i] = KB_SN_HIDE_STAR_ASCII;
+
 	for(i = 1; i < DEFAULT_SN_LEN; i++) {
 		ihid->report_sn[i - 1] = recv_buf[i];
 		index += snprintf(&report[index], MAX_POGOPIN_PAYLOAD_LEN - index, "%c", ihid->report_sn[i - 1]);

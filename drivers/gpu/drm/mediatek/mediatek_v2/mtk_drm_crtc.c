@@ -1150,6 +1150,7 @@ mtk_drm_setbacklight(struct drm_crtc *crtc, unsigned int level, bool atomic)
 	DDPINFO("%s fps: %d,level=%d,hpwm_mode=%d\n", __func__, g_cur_fps,level,hpwm_mode);
 
 	oplus_display_brightness = level;
+	hpwm_90nit_set_temp = 0;
 
 /*#ifdef OPLUS_FEATURE_DISPLAY*/
 	DDPINFO("DSI_SET_BL: hpwm_90nit_set_temp:%d,vact_timing_fps:%d,pwm_turbo:%d,pwm_power_on=%d last_backlight=%d\n", hpwm_90nit_set_temp,

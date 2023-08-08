@@ -924,6 +924,7 @@ struct mtk_battery {
 	/*fcc*/
 	int prev_batt_fcc;
 	int prev_batt_remaining_capacity;
+	struct delayed_work	 oplus_startup_rm_check_work;
 #endif /* OPLUS_FEATURE_CHG_BASIC */
 
 	/*battery plug in out*/

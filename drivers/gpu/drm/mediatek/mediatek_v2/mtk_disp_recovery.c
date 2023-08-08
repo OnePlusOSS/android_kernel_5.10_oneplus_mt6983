@@ -435,7 +435,7 @@ static int mtk_drm_request_eint(struct drm_crtc *crtc)
 	struct device_node *node;
 	u32 ints[2] = {0, 0};
 	char *compat_str = NULL;
-	int ret = 0;
+	int ret = 0, retry = 5;
 
 	if (unlikely(!esd_ctx)) {
 		DDPPR_ERR("%s:invalid ESD context\n", __func__);
@@ -469,10 +469,15 @@ static int mtk_drm_request_eint(struct drm_crtc *crtc)
 	of_property_read_u32_array(node, "debounce", ints, ARRAY_SIZE(ints));
 	esd_ctx->eint_irq = irq_of_parse_and_map(node, 0);
 
-	ret = request_irq(esd_ctx->eint_irq, _esd_check_ext_te_irq_handler,
-			  IRQF_TRIGGER_RISING, "ESD_TE-eint", esd_ctx);
-	if (ret) {
+	while((ret = request_irq(esd_ctx->eint_irq, _esd_check_ext_te_irq_handler,
+			  IRQF_TRIGGER_RISING, "ESD_TE-eint", esd_ctx)) && retry)
+	{
 		DDPPR_ERR("eint irq line %u not available! %d\n", esd_ctx->eint_irq, ret);
+		retry--;
+		msleep(5);
+	}
+	if (ret) {
+		DDPPR_ERR("irq not available! %d\n", ret);
 		return ret;
 	}
 

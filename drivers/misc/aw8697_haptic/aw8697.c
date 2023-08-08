@@ -9441,7 +9441,7 @@ static void aw8697_vibrator_work_routine(struct work_struct *work)
 		mutex_lock(&aw8697->lock);
 		if(aw8697->activate_mode == AW8697_HAPTIC_ACTIVATE_RAM_MODE) {
 
-			if (aw8697->device_id == 832 || aw8697->device_id == 833 || aw8697->device_id == 81538)
+			if (aw8697->device_id == 832 || aw8697->device_id == 833 || aw8697->device_id == 81538 || aw8697->device_id == 815)
 				aw8697_haptic_ram_vbat_comp(aw8697, false);
 			else
 				aw8697_haptic_ram_vbat_comp(aw8697, true);

@@ -181,7 +181,7 @@ static unsigned int do_2a_gain_ov64b(struct EEPROM_DRV_FD_DATA *pdata,
 			CalB  = (CalGain >> 48) & 0xFFFF;
 			debug_log("CalR:%d, CalB:%d",CalR, CalB);
 			CalR  = CalR * rgCalValue / 1000;
-			CalB  = CalB * rgCalValue / 1000;
+			CalB  = CalB * bgCalValue / 1000;
 			if (CalR > CalG)
 				/* R > G */
 				if (CalR > CalB)
@@ -232,7 +232,7 @@ static unsigned int do_2a_gain_ov64b(struct EEPROM_DRV_FD_DATA *pdata,
 			FacB  = (FacGain >> 48) & 0xFFFF;
 			debug_log("GoldenR:%d, GoldenB:%d",FacR, FacB);
 			FacR  = FacR * rgCalValue / 1000;
-			FacB  = FacB * rgCalValue / 1000;
+			FacB  = FacB * bgCalValue / 1000;
 			if (FacR > FacG)
 				if (FacR > FacB)
 					tempMax = FacR;
@@ -320,7 +320,7 @@ static unsigned int do_2a_gain_ov64b(struct EEPROM_DRV_FD_DATA *pdata,
 			CalB  = (CalGain >> 48) & 0xFFFF;
 			debug_log("CalR:%d, CalB:%d",CalR, CalB);
 			CalR  = CalR * rgCalValue / 1000;
-			CalB  = CalB * rgCalValue / 1000;
+			CalB  = CalB * bgCalValue / 1000;
 			if (CalR > CalG)
 				/* R > G */
 				if (CalR > CalB)
@@ -373,7 +373,7 @@ static unsigned int do_2a_gain_ov64b(struct EEPROM_DRV_FD_DATA *pdata,
 			FacB  = (FacGain >> 48) & 0xFFFF;
 			debug_log("GoldenR:%d, GoldenB:%d",FacR, FacB);
 			FacR  = FacR * rgCalValue / 1000;
-			FacB  = FacB * rgCalValue / 1000;
+			FacB  = FacB * bgCalValue / 1000;
 			if (FacR > FacG)
 				if (FacR > FacB)
 					tempMax = FacR;

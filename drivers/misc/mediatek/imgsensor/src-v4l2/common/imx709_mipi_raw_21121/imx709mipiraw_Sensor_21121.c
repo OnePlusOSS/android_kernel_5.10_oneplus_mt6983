@@ -46,6 +46,7 @@
 #include "imx709mipiraw_Sensor_21121.h"
 #include "imx709_ana_gain_table_21121.h"
 #include "imx709_eeprom_21121.h"
+#include "imx709_vcm_21121.h"
 
 #include "adaptor-subdrv.h"
 #include "adaptor-i2c.h"
@@ -4825,6 +4826,13 @@ static int open(struct subdrv_ctx *ctx)
     UINT32 sensor_id = 0;
 
     LOG_INF("IMX709 open start\n");
+
+    if (ctx->is_esd_enable == true) {
+        LOG_INF("Esd reset occur, reinit vcm");
+        write_imx709_21121_vcm_init(ctx);
+        ctx->is_esd_enable = false;
+    }
+
     /*sensor have two i2c address 0x6c 0x6d & 0x21 0x20,
      *we should detect the module used i2c address
      */

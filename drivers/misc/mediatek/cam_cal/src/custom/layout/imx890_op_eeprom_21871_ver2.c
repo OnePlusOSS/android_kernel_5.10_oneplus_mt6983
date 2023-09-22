@@ -138,6 +138,7 @@ static unsigned int do_2a_gain_imx890_ver2(struct EEPROM_DRV_FD_DATA *pdata,
 	int tempMax = 0;
 	int CalR = 1, CalGr = 1, CalGb = 1, CalG = 1, CalB = 1;
 	int FacR = 1, FacGr = 1, FacGb = 1, FacG = 1, FacB = 1;
+	int rgCalValue = 1, bgCalValue = 1;
 	unsigned int awb_offset;
 
 	(void) start_addr;
@@ -166,6 +167,21 @@ static unsigned int do_2a_gain_imx890_ver2(struct EEPROM_DRV_FD_DATA *pdata,
 	/* AWB Calibration Data*/
 	if (0x1 & AWBAFConfig) {
 		pCamCalData->Single2A.S2aAwb.rGainSetNum = 0x02;
+		debug_log("5100K AWB\n");
+		awb_offset = 0x60;
+		read_data_size = read_data(pdata, pCamCalData->sensorID, pCamCalData->deviceID,
+				awb_offset, 8, (unsigned char *)&CalGain);
+		if (read_data_size > 0) {
+			debug_log("Read CalGain OK\n");
+			rgCalValue = CalGain & 0xFFFF;
+			bgCalValue = (CalGain >> 16) & 0xFFFF;
+			debug_log("Light source calibration value R/G: %d, B/G: %d", rgCalValue, bgCalValue);
+			err = CAM_CAL_ERR_NO_ERR;
+		} else {
+			pCamCalData->Single2A.S2aBitEn = CAM_CAL_NONE_BITEN;
+			pr_debug_err("Read CalGain Failed\n");
+			show_cmd_error_log(pCamCalData->Command);
+		}
 		/* AWB Unit Gain (5100K) */
 		pr_debug_if(dump_enable, "5100K AWB\n");
 		awb_offset = 0x20;
@@ -178,6 +194,9 @@ static unsigned int do_2a_gain_imx890_ver2(struct EEPROM_DRV_FD_DATA *pdata,
 			CalGb = (CalGain >> 32) & 0xFFFF;
 			CalG  = ((CalGr + CalGb) + 1) >> 1;
 			CalB  = (CalGain >> 48) & 0xFFFF;
+			debug_log("CalR:%d, CalB:%d",CalR, CalB);
+			CalR  = CalR * rgCalValue / 1000;
+			CalB  = CalB * bgCalValue / 1000;
 			if (CalR > CalG)
 				/* R > G */
 				if (CalR > CalB)
@@ -226,6 +245,9 @@ static unsigned int do_2a_gain_imx890_ver2(struct EEPROM_DRV_FD_DATA *pdata,
 			FacGb = (FacGain >> 32) & 0xFFFF;
 			FacG  = ((FacGr + FacGb) + 1) >> 1;
 			FacB  = (FacGain >> 48) & 0xFFFF;
+			debug_log("GoldenR:%d, GoldenB:%d",FacR, FacB);
+			FacR  = FacR * rgCalValue / 1000;
+			FacB  = FacB * bgCalValue / 1000;
 			if (FacR > FacG)
 				if (FacR > FacB)
 					tempMax = FacR;
@@ -392,6 +414,21 @@ static unsigned int do_2a_gain_imx890_ver2(struct EEPROM_DRV_FD_DATA *pdata,
 		#endif
 		#endif
 		/* AWB Unit Gain (3100K) */
+		debug_log("3100K AWB\n");
+		awb_offset = 0x6C;
+		read_data_size = read_data(pdata, pCamCalData->sensorID, pCamCalData->deviceID,
+				awb_offset, 8, (unsigned char *)&CalGain);
+		if (read_data_size > 0) {
+			debug_log("Read CalGain OK\n");
+			rgCalValue = CalGain & 0xFFFF;
+			bgCalValue = (CalGain >> 16) & 0xFFFF;
+			debug_log("Light source calibration value R/G: %d, B/G: %d", rgCalValue, bgCalValue);
+			err = CAM_CAL_ERR_NO_ERR;
+		} else {
+			pCamCalData->Single2A.S2aBitEn = CAM_CAL_NONE_BITEN;
+			pr_debug_err("Read CalGain Failed\n");
+			show_cmd_error_log(pCamCalData->Command);
+		}
 		CalR = CalGr = CalGb = CalG = CalB = 0;
 		tempMax = 0;
 		pr_debug_if(dump_enable, "3100K AWB\n");
@@ -405,6 +442,9 @@ static unsigned int do_2a_gain_imx890_ver2(struct EEPROM_DRV_FD_DATA *pdata,
 			CalGb = (CalGain >> 32) & 0xFFFF;
 			CalG  = ((CalGr + CalGb) + 1) >> 1;
 			CalB  = (CalGain >> 48) & 0xFFFF;
+			debug_log("CalR:%d, CalB:%d",CalR, CalB);
+			CalR  = CalR * rgCalValue / 1000;
+			CalB  = CalB * bgCalValue / 1000;
 			if (CalR > CalG)
 				/* R > G */
 				if (CalR > CalB)
@@ -455,6 +495,9 @@ static unsigned int do_2a_gain_imx890_ver2(struct EEPROM_DRV_FD_DATA *pdata,
 			FacGb = (FacGain >> 32) & 0xFFFF;
 			FacG  = ((FacGr + FacGb) + 1) >> 1;
 			FacB  = (FacGain >> 48) & 0xFFFF;
+			debug_log("GoldenR:%d, GoldenB:%d",FacR, FacB);
+			FacR  = FacR * rgCalValue / 1000;
+			FacB  = FacB * bgCalValue / 1000;
 			if (FacR > FacG)
 				if (FacR > FacB)
 					tempMax = FacR;

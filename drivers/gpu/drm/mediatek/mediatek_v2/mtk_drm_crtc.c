@@ -5386,6 +5386,7 @@ static void ddp_cmdq_cb(struct cmdq_cb_data data)
 	unsigned int _dsi_state_dbg7_2 = 0;
 	ktime_t pf_time = 0;
 	int crtc_state_stylus = to_mtk_crtc_state(crtc_state)->prop_val[CRTC_PROP_STYLUS];
+	struct sched_param param = {.sched_priority = 87};
 
 	DDPINFO("crtc_state:%x, atomic_state:%x, crtc:%x, err:%d,rec_irq:%llu\n",
 		crtc_state,
@@ -5396,6 +5397,8 @@ static void ddp_cmdq_cb(struct cmdq_cb_data data)
 		DDPINFO("NULL pointer mtk_crtc ");
 		return;
 	}
+
+	sched_setscheduler(current, SCHED_RR, &param);
 	priv = mtk_crtc->base.dev->dev_private;
 	session_id = mtk_get_session_id(crtc);
 

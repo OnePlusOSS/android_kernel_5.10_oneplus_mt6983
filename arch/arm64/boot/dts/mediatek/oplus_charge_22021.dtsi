@@ -749,6 +749,7 @@
 		qcom,voocphy_current_change_timeout = <100>;
 
 		qcom,high_curr_setting;
+		oplus,workaround_for_100w;
 
 		svooc_batt_sys_curve = <0 1 0 1 0 0 0	// 4000mA
 					0 0 0 0 0 0 1	// 3414mV

@@ -941,7 +941,7 @@ static struct mtk_panel_params ext_params[MODE_NUM] = {
 	.color_dual_brightness_status = true,
 	.color_oplus_calibrate_status = true,
 	.cmd_null_pkt_en = 1,
-	.cmd_null_pkt_len = 400,
+	.cmd_null_pkt_len = 624,
 	.vendor = "22823_Tianma_NT37705",
 	.manufacture = "Tianma4095",
 	.lane_swap_en = 0,
@@ -1018,7 +1018,7 @@ static struct mtk_panel_params ext_params[MODE_NUM] = {
         },
 	.skip_unnecessary_switch = true,
 	.prete_offset = 466,
-	.first_prete_delay_time = 14000,
+	.first_prete_delay_time = 13500,
 	},
 	//fhd 90hz
 {

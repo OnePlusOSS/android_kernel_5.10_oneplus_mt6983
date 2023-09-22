@@ -409,6 +409,7 @@ extern int oplus_dsi_log_type;
 extern int trig_db_enable;
 extern void oplus_kill_surfaceflinger(void);
 static void print_cmd_desc(const struct mipi_dsi_msg *msg);
+extern unsigned int dsi1_id3_val;
 //#endif /* OPLUS_BUG_STABILITY */
 
 static const char * const mtk_dsi_porch_str[] = {
@@ -2958,7 +2959,7 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi,
 		if ((!dsi->doze_enabled || force_lcm_update)
 			&& drm_panel_prepare(dsi->panel)) {
 			DDPPR_ERR("failed to prepare the panel\n");
-			return;
+			goto err_dsi_power_off;
 		}
 
 #ifdef OPLUS_FEATURE_DISPLAY_TEMP_COMPENSATION
@@ -10808,6 +10809,12 @@ static int mtk_dsi_probe(struct platform_device *pdev)
 			dsi->ext->is_connected = panel_connection_from_atag() & BIT(alias);
 		/*#endif*/
 #endif
+	/*#ifdef OPLUS_FEATURE_DISPLAY*/
+	} else if (dsi->ddp_comp.id == DDP_COMPONENT_DSI1) {
+		DDPINFO("dsi1 detected from lk in func %s is 0x%x\n", __func__, dsi1_id3_val);
+		if (dsi->ext && dsi->ext->is_connected == -1)
+			dsi->ext->is_connected = !!dsi1_id3_val;
+	/*#endif*/
 	}
 
 	platform_set_drvdata(pdev, dsi);

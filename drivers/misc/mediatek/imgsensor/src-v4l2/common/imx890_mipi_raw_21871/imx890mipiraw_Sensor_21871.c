@@ -4134,27 +4134,6 @@ static int feature_control(struct subdrv_ctx *ctx, MSDK_SENSOR_FEATURE_ENUM feat
                 break;
         }
         break;
-    case SENSOR_FEATURE_ESD_RESET_BY_USER:
-        switch (*feature_data) {
-            case SENSOR_SCENARIO_ID_NORMAL_PREVIEW:
-            case SENSOR_SCENARIO_ID_NORMAL_CAPTURE:
-            case SENSOR_SCENARIO_ID_NORMAL_VIDEO:
-            case SENSOR_SCENARIO_ID_HIGHSPEED_VIDEO:
-            case SENSOR_SCENARIO_ID_SLIM_VIDEO:
-            case SENSOR_SCENARIO_ID_CUSTOM1:
-            case SENSOR_SCENARIO_ID_CUSTOM2:
-            case SENSOR_SCENARIO_ID_CUSTOM3:
-            case SENSOR_SCENARIO_ID_CUSTOM4:
-            case SENSOR_SCENARIO_ID_CUSTOM5:
-            case SENSOR_SCENARIO_ID_CUSTOM6:
-            case SENSOR_SCENARIO_ID_CUSTOM7:
-            case SENSOR_SCENARIO_ID_CUSTOM8:
-            case SENSOR_SCENARIO_ID_CUSTOM9:
-            default:
-                *(MUINT32 *)(uintptr_t)(*(feature_data + 1)) = 1;
-                break;
-        }
-        break;
     default:
         break;
     }

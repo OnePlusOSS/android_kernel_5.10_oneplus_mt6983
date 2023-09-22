@@ -185,7 +185,17 @@ static int set_state(struct adaptor_ctx *ctx, void *data, int val)
 	idx = (unsigned long long)data;
 	x = idx + val;
 
+	#ifndef OPLUS_FEATURE_CAMERA_COMMON
 	ret = pinctrl_select_state(ctx->pinctrl, ctx->state[x]);
+	#else /* OPLUS_FEATURE_CAMERA_COMMON */
+	if (ctx->pinctrl) {
+		ret = pinctrl_select_state(ctx->pinctrl, ctx->state[x]);
+	} else{
+		ret = -1;
+		dev_err(ctx->dev, "pinctrl is NULL!\n");
+	}
+	#endif /* OPLUS_FEATURE_CAMERA_COMMON */
+
 	if (ret < 0) {
 		dev_err(ctx->dev, "fail to select %s\n", state_names[x]);
 		#if defined(OPLUS_FEATURE_CAMERA_COMMON) && defined(CONFIG_OPLUS_CAM_EVENT_REPORT_MODULE)

@@ -73,6 +73,11 @@ static kal_uint16 previous_exp_cnt;
 static void commit_write_sensor(struct subdrv_ctx *ctx)
 {
 #ifdef OPLUS_FEATURE_CAMERA_COMMON
+
+#define AK7314AF_I2C_SLAVE_ADDR 0x18
+#define AK7314AF_INIT_REG       0x02
+#define AK7314AF_INIT_VUALE     0X00
+
     if (_size_to_write && !ctx->fast_mode_on) {
         imx766_table_write_cmos_sensor_8(ctx, _i2c_data, _size_to_write);
         memset(_i2c_data, 0x0, sizeof(_i2c_data));
@@ -2161,8 +2166,19 @@ static int open(struct subdrv_ctx *ctx)
     kal_uint8 i = 0;
     kal_uint8 retry = 2;
     kal_uint16 sensor_id = 0;
+    int ret = -1;
 
     LOG_INF("IMX766 open Start\n");
+
+    if (ctx->is_esd_enable == true) {
+        LOG_INF("Esd reset occur, reinit vcm");
+        ret = adaptor_i2c_wr_u8_u8(ctx->i2c_client, AK7314AF_I2C_SLAVE_ADDR >> 1,
+                                        AK7314AF_INIT_REG, AK7314AF_INIT_VUALE);
+        if (ret < 0) {
+            pr_err("reinit vcm fail");
+        }
+        ctx->is_esd_enable = false;
+    }
     /*sensor have two i2c address 0x6c 0x6d & 0x21 0x20,
      *we should detect the module used i2c address
      */

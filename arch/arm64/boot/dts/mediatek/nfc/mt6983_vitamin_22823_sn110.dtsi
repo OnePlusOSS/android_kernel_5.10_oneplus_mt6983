@@ -25,6 +25,7 @@
 		nxp,sn-irq = <&pio 189 0x0>;
 		nxp,sn-ven-rstn = <&pio 35 0x0>;
 		nxp,sn-dwl-req = <&pio 34 0x0>;
+		nxp,sn-clkreq = <&pio 18 0x0>;
 		interrupt-parent = <&pio>;
        };
 };

@@ -1182,6 +1182,9 @@ static struct LCM_setting_table lcm_normal_to_aod_sam[] = {
     //{REGFLAG_DELAY,20,{}},
 
     //{REGFLAG_CMD, 1, {0x28}},
+
+    {REGFLAG_CMD, 4, {0xFF,0x78,0x38,0x02}},
+    {REGFLAG_CMD, 2, {0x00,0x17}},
     {REGFLAG_CMD, 4, {0xFF,0x78,0x38,0x00}},
     {REGFLAG_CMD, 1, {0x39}},
     {REGFLAG_CMD, 4, {0xFF,0x78,0x38,0x0C}},

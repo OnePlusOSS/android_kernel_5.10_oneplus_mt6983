@@ -93,6 +93,8 @@ static struct ufs_dev_fix ufs_mtk_dev_fixups[] = {
 		UFS_DEVICE_QUIRK_SUPPORT_EXTENDED_FEATURES),
 	UFS_FIX(UFS_VENDOR_SKHYNIX, "H9HQ15AFAMBDAR",
 		UFS_DEVICE_QUIRK_DELAY_BEFORE_LPM | UFS_DEVICE_QUIRK_DELAY_AFTER_LPM),
+	UFS_FIX(UFS_VENDOR_SAMSUNG, "KLUFG4LHGC-B0E1",
+		UFS_DEVICE_QUIRK_SAMSUNG_QLC),
 	END_FIX
 };
 
@@ -1035,6 +1037,17 @@ static void ufs_mtk_trace_vh_compl_command(void *data, struct ufs_hba *hba, stru
 		}
 	}
         /*feature-devinfo-v001-4-end*/
+
+        /* if cost more than 100ms, print out in dmesg for IO analyze */
+	if ((cmd->cmnd[0] == READ_10 || cmd->cmnd[0] == WRITE_10 || cmd->cmnd[0] == READ_16 || cmd->cmnd[0] == WRITE_16) &&
+	    ktime_us_delta(lrbp->compl_time_stamp, lrbp->issue_time_stamp) > 100000) {
+		printk_ratelimited(
+			KERN_WARNING "%s cost more than 100ms, it's %dms\n",
+			cmd->cmnd[0] == READ_10 ? "READ_10" :
+			cmd->cmnd[0] == WRITE_10 ? "WRITE_10" :
+			cmd->cmnd[0] == READ_16 ? "READ_16" : "WRITE_16",
+			ktime_us_delta(lrbp->compl_time_stamp, lrbp->issue_time_stamp) / 1000);
+	}
 }
 
 static struct tracepoints_table interests[] = {
@@ -1439,7 +1452,7 @@ int ufs_ioctl_monitor(struct scsi_device *dev, void __user *buf_user)
 	req = scsi_req(rq);
 
 	cmdlen = COMMAND_SIZE(opcode);
-	if ((VENDOR_SPECIFIC_CDB == opcode) &&(0 == strncmp(dev->vendor, "SAMSUNG ", 8)))
+	if (((VENDOR_SPECIFIC_CDB == opcode) && (0 == strncmp(dev->vendor, "SAMSUNG ", 8))) || ((READ_BUFFER == opcode) && (0 == strncmp(dev->vendor, "YMTC ", 5))))
 		cmdlen = 16;
 
 	/*
@@ -2223,6 +2236,31 @@ void remove_signal_quality_proc(struct unipro_signal_quality_ctrl *signalCtrl)
 }
 //#endif /*OPLUS_UFS_SIGNAL_QUALITY*/
 /*feature-flashaging806-v001-2-end*/
+
+/*feature-iostack-v001-begin*/
+#define IOSTACK_WORK_DELAY  (10 * HZ)
+static void iostack_monitor_work(struct work_struct *work)
+{
+	struct ufs_mtk_host *host = container_of(to_delayed_work(work),
+							struct ufs_mtk_host,
+							iostack_work);
+	struct ufs_hba *hba = host->hba;
+	unsigned int hba_irqs = 0;
+	unsigned int self_block = hba->host->host_self_blocked;
+
+	hba_irqs = kstat_irqs_usr(hba->irq);
+	pr_err("iostack:hba_irqs = %d, self-block = %d\n", hba_irqs, self_block);
+	schedule_delayed_work(&host->iostack_work, IOSTACK_WORK_DELAY);
+}
+
+static void ufs_iostack_init(struct ufs_mtk_host *host)
+{
+	INIT_DELAYED_WORK(&host->iostack_work, iostack_monitor_work);
+	schedule_delayed_work(&host->iostack_work, IOSTACK_WORK_DELAY);
+}
+/*feature-iostack-v001-end*/
+
+
 /**
  * ufs_mtk_init - find other essential mmio bases
  * @hba: host controller instance
@@ -2338,6 +2376,7 @@ skip_vcc:
 					  unsigned int,
 					  void __user *))ufs_mtk_ioctl;
 #endif
+	ufs_iostack_init(host);
 	goto out;
 
 out_variant_clear:
@@ -2866,9 +2905,17 @@ static void ufs_mtk_fixup_dev_quirks(struct ufs_hba *hba)
 
 	ufs_mtk_install_tracepoints(hba);
 
+	/* give more time for H8 */
+	if (STR_PRFX_EQUAL("KLUFG4LHGC-B0E1", dev_info->model)) {
+		hba->rpm_lvl = UFS_PM_LVL_1;
+		hba->spm_lvl = UFS_PM_LVL_1;
+	}
+
 #if defined(CONFIG_UFSFEATURE)
-	if (hba->dev_info.wmanufacturerid == UFS_VENDOR_SAMSUNG) {
+	if (hba->dev_quirks & UFS_DEVICE_QUIRK_SAMSUNG_QLC) {
 		host->ufsf.hba = hba;
+		if (hba->caps & UFSHCD_CAP_WB_EN)
+			hba->caps &= ~UFSHCD_CAP_WB_EN;
 		ufsf_set_init_state(ufs_mtk_get_ufsf(hba));
 	}
 #endif

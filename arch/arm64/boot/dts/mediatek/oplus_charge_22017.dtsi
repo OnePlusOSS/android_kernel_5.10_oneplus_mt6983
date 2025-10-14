@@ -296,6 +296,11 @@
 	qcom,default_temp_little_cool_vfloat_mv = <4435>;
 	qcom,default_little_cool_vfloat_over_sw_limit = <4445>;
 
+	oplus,poweroff_high_batt_temp = <720>;
+	oplus,poweroff_emergency_batt_temp = <770>;
+	oplus,usbtemp_batt_temp_over_hot = <60>;
+	oplus,usbtemp_temp_gap_with_batt_temp_in_over_hot = <15>;
+
 	//for PD9V or QC9V
 	qcom,vbatt_pdqc_to_5v_thr = <4435>;
 	qcom,vbatt_pdqc_to_9v_thr = <4435>;
@@ -371,6 +376,7 @@
 		status = "okay";
 		compatible = "sc,sc8547-master";
 		reg = <0x6F 0>;
+                ovp_reg = <0x36>; /* vbat_ovp:4.85V */
 
 		qcom,irq_gpio = <&pio 10 0x00>;
 		interrupt-parent = <&pio>;
@@ -614,6 +620,7 @@
 		status = "okay";
 		compatible = "sc,sc8547-slave";
 		reg = <0x6F 0>;
+                ovp_reg = <0x36>; /* vbat_ovp:4.85V */
 	};
 };
 
@@ -745,6 +752,10 @@
 	charger_no_wiress;
 	sub_board_temp_support;
 	support_sdp_screenoff;
+
+	high-temp-scheme;
+	over_high_temp_thr = <60>;
+
 	support_battery_type = <2>;  /* BATTERY_4P45V_SINGLE */
 	max_charger_voltage = <15000000>;
 	boot_battery_voltage = <3400000>;

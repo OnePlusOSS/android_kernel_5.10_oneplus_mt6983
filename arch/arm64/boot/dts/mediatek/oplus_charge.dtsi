@@ -293,6 +293,11 @@
 
 	qcom,support_abnormal_adapter;
 
+	oplus,poweroff_high_batt_temp = <720>;
+	oplus,poweroff_emergency_batt_temp = <770>;
+	oplus,usbtemp_batt_temp_over_hot = <60>;
+	oplus,usbtemp_temp_gap_with_batt_temp_in_over_hot = <15>;
+
 	//for PD9V or QC9V
 	qcom,vbatt_pdqc_to_5v_thr = <4100>;
 	qcom,vbatt_pdqc_to_9v_thr = <4000>;
@@ -6506,6 +6511,9 @@
 	charger_by_buckboost;
 	support_tuv_authentication;
 	support_sdp_screenoff;
+
+	high-temp-scheme;
+	over_high_temp_thr = <60>;
 
 	max_charger_voltage = <15000000>;
 	boot_battery_voltage = <3350000>;

@@ -2168,7 +2168,10 @@ int mtk_drm_aod_setbacklight(struct drm_crtc *crtc, unsigned int level)
 	}
 
 	client = mtk_crtc->gce_obj.client[CLIENT_CFG];
-	if (!mtk_crtc->enabled) {
+	/* send LCM CMD */
+	is_frame_mode = mtk_crtc_is_frame_trigger_mode(&mtk_crtc->base);
+
+	if (!mtk_crtc->enabled && is_frame_mode) {
 		/* 1. power on mtcmos */
 		mtk_drm_top_clk_prepare_enable(crtc->dev);
 
@@ -2186,10 +2189,12 @@ int mtk_drm_aod_setbacklight(struct drm_crtc *crtc, unsigned int level)
 		for_each_comp_in_cur_crtc_path(comp, mtk_crtc, i, j)
 			mtk_dump_analysis(comp);
 	}
-
-	/* send LCM CMD */
-	is_frame_mode = mtk_crtc_is_frame_trigger_mode(&mtk_crtc->base);
-
+	else if (!mtk_crtc->enabled && !is_frame_mode){
+		mtk_drm_crtc_wk_lock(crtc, 0, __func__, __LINE__);
+		DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
+		mutex_unlock(&priv->commit.lock);
+		return -ENODEV;
+	}
 	if (is_frame_mode)
 		mtk_crtc_pkt_create(&cmdq_handle, &mtk_crtc->base,
 						mtk_crtc->gce_obj.client[CLIENT_CFG]);
@@ -6477,7 +6482,7 @@ void mtk_crtc_start_event_loop(struct drm_crtc *crtc)
 
 	priv = mtk_crtc->base.dev->dev_private;
 #ifdef OPLUS_FEATURE_DISPLAY
-	if (is_first_prete && first_prete_delay_time != 0 && cur_fps == 60 && pre_fps != cur_fps) {
+	if (is_first_prete && first_prete_delay_time != 0 && (cur_fps == 60 || cur_fps == 90) && pre_fps != cur_fps) {
 		cb_data = kmalloc(sizeof(*cb_data), GFP_KERNEL);
 		if (!cb_data) {
 			DDPPR_ERR("cb data creation failed\n");

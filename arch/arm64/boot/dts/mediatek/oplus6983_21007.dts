@@ -88,6 +88,10 @@
 		};
 };
 
+&memory_ssmr_features {
+    prot-region-based-size = <0 0x200000>;
+};
+
 /*Trustonic Mobicore real driver*/
 &mobicore {
 	trustonic,real-drv=<1>;

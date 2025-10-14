@@ -91,7 +91,7 @@
 	qcom,hv_flashled_support;
 	qcom,chargerid_support;
 	qcom,smart_chg_soh_support;
-	oplus,aging_ffc_version = <1>;
+	oplus_spec,dec-vol-fv-mv = <40>;
 	qcom,smart_charging_screenoff;
 	qcom,support_usbtemp_protect_v2;
 	qcom,usbtemp_batt_temp_low = <50>;
@@ -296,6 +296,11 @@
 	qcom,ccdetect_by_wd0;
 
 	qcom,support_abnormal_adapter;
+
+	oplus,poweroff_high_batt_temp = <720>;
+	oplus,poweroff_emergency_batt_temp = <770>;
+	oplus,usbtemp_batt_temp_over_hot = <60>;
+	oplus,usbtemp_temp_gap_with_batt_temp_in_over_hot = <15>;
 
 	//for PD9V or QC9V
 	qcom,vbatt_pdqc_to_5v_thr = <4100>;
@@ -1877,6 +1882,9 @@
 	charger_by_buckboost;
 	support_tuv_authentication;
 	support_sdp_screenoff;
+
+	high-temp-scheme;
+	over_high_temp_thr = <60>;
 
 	led_brightness = <102>;
 	max_charger_voltage = <10200000>;

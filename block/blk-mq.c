@@ -1210,6 +1210,22 @@ static bool blk_mq_mark_tag_wait(struct blk_mq_hw_ctx *hctx,
 	__add_wait_queue(wq, wait);
 
 	/*
+	 * Add one explicit barrier since blk_mq_get_driver_tag() may
+	 * not imply barrier in case of failure.
+	 *
+	 * Order adding us to wait queue and allocating driver tag.
+	 *
+	 * The pair is the one implied in sbitmap_queue_wake_up() which
+	 * orders clearing sbitmap tag bits and waitqueue_active() in
+	 * __sbitmap_queue_wake_up(), since waitqueue_active() is lockless
+	 *
+	 * Otherwise, re-order of adding wait queue and getting driver tag
+	 * may cause __sbitmap_queue_wake_up() to wake up nothing because
+	 * the waitqueue_active() may not observe us in wait queue.
+	 */
+	smp_mb();
+
+	/*
 	 * It's possible that a tag was freed in the window between the
 	 * allocation failure and adding the hardware queue to the wait
 	 * queue.
@@ -4071,6 +4087,22 @@ unsigned int blk_mq_rq_cpu(struct request *rq)
 	return rq->mq_ctx->cpu;
 }
 EXPORT_SYMBOL(blk_mq_rq_cpu);
+
+#ifdef CONFIG_BLK_MQ_USE_LOCAL_THREAD
+const char *of_blk_feature_read(char *name)
+{
+	const char *value = NULL;
+
+	if (name) {
+		struct device_node *np = of_find_node_opts_by_path(BLK_MQ_DTS_PATH, NULL);
+		if (np) {
+			of_property_read_string(np, name, &value);
+		}
+	}
+
+	return value;
+}
+#endif
 
 static int __init blk_mq_init(void)
 {

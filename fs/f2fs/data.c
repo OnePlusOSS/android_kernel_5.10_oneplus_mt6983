@@ -21,9 +21,7 @@
 #include <linux/cleancache.h>
 #include <linux/sched/signal.h>
 #include <linux/fiemap.h>
-#ifdef CONFIG_F2FS_FS_COMPRESSION_FIXED_OUTPUT
-#include <linux/cpuhotplug.h>
-#endif
+#include <linux/iomap.h>
 
 #include "f2fs.h"
 #include "node.h"
@@ -40,10 +38,6 @@ static mempool_t *bio_post_read_ctx_pool;
 struct bio_set f2fs_bioset;
 #else
 static struct bio_set f2fs_bioset;
-#endif
-
-#ifdef CONFIG_F2FS_FS_COMPRESSION_FIXED_OUTPUT
-static struct kthread_worker __rcu **post_read_pcpu_workers;
 #endif
 
 #define	F2FS_BIO_POOL_SIZE	NR_CURSEG_TYPE
@@ -137,14 +131,7 @@ enum bio_post_read_step {
 struct bio_post_read_ctx {
 	struct bio *bio;
 	struct f2fs_sb_info *sbi;
-#ifdef CONFIG_F2FS_FS_COMPRESSION_FIXED_OUTPUT
-	union {
-		struct work_struct work;
-		struct kthread_work kwork;
-	};
-#else
 	struct work_struct work;
-#endif
 	unsigned int enabled_steps;
 #ifdef CONFIG_F2FS_FS_DEDUP
 	struct inode *inode;
@@ -337,9 +324,10 @@ static int f2fs_fscrypt_decrypt_pagecache_blocks(struct page *page, unsigned int
 		goto out;
 	}
 
-	for (i = offs; i < offs + len; i += blocksize, lblk_num++) {
+	for (i = offs; i < offs + len; lblk_num++) {
 		err = fscrypt_encrypt_block_inplace(inode, page,
 				blocksize, i, lblk_num, GFP_NOFS);
+		i += blocksize;
 		if (err)
 			goto out;
 	}
@@ -386,13 +374,6 @@ static void f2fs_post_read_work(struct work_struct *work)
 	f2fs_verify_and_finish_bio(ctx->bio, true);
 }
 
-#ifdef CONFIG_F2FS_FS_COMPRESSION_FIXED_OUTPUT
-static void f2fs_post_read_kwork(struct kthread_work *kwork)
-{
-	f2fs_post_read_work((struct work_struct *)kwork);
-}
-#endif
-
 static void f2fs_read_end_io(struct bio *bio)
 {
 	struct f2fs_sb_info *sbi = F2FS_P_SB(bio_first_page_all(bio));
@@ -424,23 +405,8 @@ static void f2fs_read_end_io(struct bio *bio)
 				!f2fs_low_mem_mode(sbi)) {
 			f2fs_handle_step_decompress(ctx, intask);
 		} else if (enabled_steps) {
-#ifdef CONFIG_F2FS_FS_COMPRESSION_FIXED_OUTPUT
-			struct kthread_worker *worker;
-
-			rcu_read_lock();
-			worker = rcu_dereference(post_read_pcpu_workers[raw_smp_processor_id()]);
-			if (!worker) {
-				INIT_WORK(&ctx->work, f2fs_post_read_work);
-				queue_work(ctx->sbi->post_read_wq, &ctx->work);
-			} else {
-				kthread_init_work(&ctx->kwork, f2fs_post_read_kwork);
-				kthread_queue_work(worker, &ctx->kwork);
-			}
-			rcu_read_unlock();
-#else
 			INIT_WORK(&ctx->work, f2fs_post_read_work);
 			queue_work(ctx->sbi->post_read_wq, &ctx->work);
-#endif
 			return;
 		}
 	}
@@ -885,7 +851,7 @@ int f2fs_submit_page_bio(struct f2fs_io_info *fio)
 	}
 
 	if (fio->io_wbc && !is_read_io(fio->op))
-		wbc_account_cgroup_owner(fio->io_wbc, page, PAGE_SIZE);
+		wbc_account_cgroup_owner(fio->io_wbc, fio->page, PAGE_SIZE);
 
 	__attach_io_flag(fio);
 	bio_set_op_attrs(bio, fio->op, fio->op_flags);
@@ -1016,6 +982,8 @@ void f2fs_submit_merged_ipu_write(struct f2fs_sb_info *sbi,
 	bool found = false;
 	struct bio *target = bio ? *bio : NULL;
 
+	f2fs_bug_on(sbi, !target && !page);
+
 	for (temp = HOT; temp < NR_TEMP_TYPE && !found; temp++) {
 		struct f2fs_bio_info *io = sbi->write_io[DATA] + temp;
 		struct list_head *head = &io->bio_list;
@@ -1095,7 +1063,7 @@ alloc_new:
 	}
 
 	if (fio->io_wbc)
-		wbc_account_cgroup_owner(fio->io_wbc, page, PAGE_SIZE);
+		wbc_account_cgroup_owner(fio->io_wbc, fio->page, PAGE_SIZE);
 
 	inc_page_count(fio->sbi, WB_DATA_TYPE(page));
 
@@ -1169,7 +1137,7 @@ alloc_new:
 	}
 
 	if (fio->io_wbc)
-		wbc_account_cgroup_owner(fio->io_wbc, bio_page, PAGE_SIZE);
+		wbc_account_cgroup_owner(fio->io_wbc, fio->page, PAGE_SIZE);
 
 	io->last_block_in_bio = fio->new_blkaddr;
 
@@ -1582,11 +1550,8 @@ alloc:
 	old_blkaddr = dn->data_blkaddr;
 	f2fs_allocate_data_block(sbi, NULL, old_blkaddr, &dn->data_blkaddr,
 				&sum, seg_type, NULL);
-	if (GET_SEGNO(sbi, old_blkaddr) != NULL_SEGNO) {
-		invalidate_mapping_pages(META_MAPPING(sbi),
-					old_blkaddr, old_blkaddr);
-		f2fs_invalidate_compress_page(sbi, old_blkaddr);
-	}
+	if (GET_SEGNO(sbi, old_blkaddr) != NULL_SEGNO)
+		f2fs_invalidate_internal_cache(sbi, old_blkaddr);
 	f2fs_update_data_blkaddr(dn, dn->data_blkaddr);
 
 	/*
@@ -3075,7 +3040,8 @@ int f2fs_write_single_data_page(struct page *page, int *submitted,
 		 * don't drop any dirty dentry pages for keeping lastest
 		 * directory structure.
 		 */
-		if (S_ISDIR(inode->i_mode))
+		if (S_ISDIR(inode->i_mode) &&
+				!is_sbi_flag_set(sbi, SBI_IS_CLOSE))
 			goto redirty_out;
 		goto out;
 	}
@@ -3180,7 +3146,8 @@ out:
 
 	if (unlikely(f2fs_cp_error(sbi))) {
 		f2fs_submit_merged_write(sbi, DATA);
-		f2fs_submit_merged_ipu_write(sbi, bio, NULL);
+		if (bio && *bio)
+			f2fs_submit_merged_ipu_write(sbi, bio, NULL);
 		submitted = NULL;
 	}
 
@@ -3303,6 +3270,9 @@ retry:
 		tag_pages_for_writeback(mapping, index, end);
 	done_index = index;
 	while (!done && !retry && (index <= end)) {
+		/* fix coverity error: Dereferencing a pointer that might be NULL pages */
+		if (!pages)
+			break;
 		nr_pages = find_get_pages_range_tag(mapping, &index, end,
 				tag, max_pages, pages);
 		if (nr_pages == 0)
@@ -4029,7 +3999,21 @@ static ssize_t f2fs_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
 		if (do_opu)
 			f2fs_down_read(&fi->i_gc_rwsem[READ]);
 	}
-
+#ifdef CONFIG_DEVICE_XCOPY
+	/* force read dio to bufio if xcopy is running */
+	if (rw == READ) {
+		if (atomic_read(&fi->file_xcopy_cnt)) {
+			if (do_opu)
+				f2fs_up_read(&fi->i_gc_rwsem[READ]);
+			f2fs_up_read(&fi->i_gc_rwsem[rw]);
+			/* change count to 0 for trace dump info */
+			count = 0;
+			/* set err to 0 for force read dio to bufio */
+			err = 0;
+			goto out;
+		}
+	}
+#endif
 	err = __blockdev_direct_IO(iocb, inode, inode->i_sb->s_bdev,
 			iter, rw == WRITE ? get_data_block_dio_write :
 			get_data_block_dio, NULL, f2fs_dio_submit_bio,
@@ -4566,128 +4550,6 @@ void f2fs_clear_page_cache_dirty_tag(struct page *page)
 	xa_unlock_irqrestore(&mapping->i_pages, flags);
 }
 
-#ifdef CONFIG_F2FS_FS_COMPRESSION_FIXED_OUTPUT
-static struct kthread_worker *f2fs_init_percpu_worker(int cpu)
-{
-	struct kthread_worker *worker =
-		kthread_create_worker_on_cpu(cpu, 0, "f2fs_worker/%u", cpu);
-
-	if (IS_ERR(worker))
-		return worker;
-
-	sched_set_fifo_low(worker->task);
-	return worker;
-}
-
-#ifdef CONFIG_HOTPLUG_CPU
-static enum cpuhp_state cpuhp_state;
-static DEFINE_SPINLOCK(post_read_pcpu_worker_lock);
-
-static int f2fs_cpu_online(unsigned int cpu)
-{
-	struct kthread_worker *worker, *old;
-
-	worker = f2fs_init_percpu_worker(cpu);
-	if (IS_ERR(worker))
-		return PTR_ERR(worker);
-
-	spin_lock(&post_read_pcpu_worker_lock);
-	old = rcu_dereference_protected(post_read_pcpu_workers[cpu],
-			lockdep_is_held(&post_read_pcpu_worker_lock));
-	if (!old)
-		rcu_assign_pointer(post_read_pcpu_workers[cpu], worker);
-	spin_unlock(&post_read_pcpu_worker_lock);
-	if (old)
-		kthread_destroy_worker(worker);
-	return 0;
-}
-
-static int f2fs_cpu_offline(unsigned int cpu)
-{
-	struct kthread_worker *worker;
-
-	spin_lock(&post_read_pcpu_worker_lock);
-	worker = rcu_dereference_protected(post_read_pcpu_workers[cpu],
-			lockdep_is_held(&post_read_pcpu_worker_lock));
-	rcu_assign_pointer(post_read_pcpu_workers[cpu], NULL);
-	spin_unlock(&post_read_pcpu_worker_lock);
-
-	synchronize_rcu();
-	if (worker)
-		kthread_destroy_worker(worker);
-	return 0;
-}
-
-static int f2fs_cpu_hotplug_init(void)
-{
-	int state;
-
-	state = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
-			"fs/f2fs:online", f2fs_cpu_online, f2fs_cpu_offline);
-	if (state < 0)
-		return state;
-
-	cpuhp_state = state;
-	return 0;
-}
-
-static void f2fs_cpu_hotplug_destroy(void)
-{
-	if (cpuhp_state)
-		cpuhp_remove_state_nocalls(cpuhp_state);
-}
-#else
-static inline int f2fs_cpu_hotplug_init(void) { return 0; }
-static inline void f2fs_cpu_hotplug_destroy(void) {}
-#endif
-
-static void f2fs_destroy_percpu_workers(void)
-{
-	struct kthread_worker *worker;
-	unsigned int cpu;
-
-	if (!post_read_pcpu_workers)
-		return;
-
-	f2fs_cpu_hotplug_destroy();
-
-	for_each_possible_cpu(cpu) {
-		worker = rcu_dereference_protected(post_read_pcpu_workers[cpu], 1);
-		rcu_assign_pointer(post_read_pcpu_workers[cpu], NULL);
-		if (worker)
-			kthread_destroy_worker(worker);
-	}
-	kfree(post_read_pcpu_workers);
-	post_read_pcpu_workers = NULL;
-}
-
-static void __init f2fs_init_percpu_workers(void)
-{
-	struct kthread_worker *worker;
-	unsigned int cpu;
-	int ret;
-
-	post_read_pcpu_workers = kcalloc(num_possible_cpus(),
-			sizeof(struct kthread_worker *), GFP_ATOMIC); // FIXME: need atomic?
-	if (!post_read_pcpu_workers) {
-		pr_warn("F2FS: failed to allocate pcpu workers\n");
-		return;
-	}
-
-	for_each_online_cpu(cpu) {
-		worker = f2fs_init_percpu_worker(cpu);
-		if (!IS_ERR(worker))
-			rcu_assign_pointer(post_read_pcpu_workers[cpu], worker);
-	}
-
-	ret = f2fs_cpu_hotplug_init();
-	if (ret < 0) {
-		pr_warn("F2FS: failed to init cpu hotplug handler\n");
-		f2fs_destroy_percpu_workers();
-	}
-}
-#endif
-
 int __init f2fs_init_post_read_processing(void)
 {
 	bio_post_read_ctx_cache =
@@ -4700,11 +4562,6 @@ int __init f2fs_init_post_read_processing(void)
 					 bio_post_read_ctx_cache);
 	if (!bio_post_read_ctx_pool)
 		goto fail_free_cache;
-
-#ifdef CONFIG_F2FS_FS_COMPRESSION_FIXED_OUTPUT
-	f2fs_init_percpu_workers();
-#endif
-
 	return 0;
 
 fail_free_cache:
@@ -4715,9 +4572,6 @@ fail:
 
 void f2fs_destroy_post_read_processing(void)
 {
-#ifdef CONFIG_F2FS_FS_COMPRESSION_FIXED_OUTPUT
-	f2fs_destroy_percpu_workers();
-#endif
 	mempool_destroy(bio_post_read_ctx_pool);
 	kmem_cache_destroy(bio_post_read_ctx_cache);
 }

@@ -41,6 +41,10 @@
 	};
 };
 
+&mt6375_chg {
+	ircmp_v = <0>;
+};
+
 &u2port0 {
 	mediatek,eye-vrt = <7>;
 	mediatek,eye-term = <7>;
@@ -858,7 +862,7 @@
 		oplus_spec,vbat_charging_uv_thr_mv = <3200>;
 
 		/*If use subboard NTC as battery temp, config it as 20, otherwise 0 */
-		oplus,tbatt_power_off_cali_temp = <20>;
+		oplus_spec,tbatt_power_off_cali_temp = <20>;
 		oplus,vooc_show_ui_soc_decimal;
 		oplus,ui_soc_decimal_speedmin = <2>;
 		oplus,gauge_stuck_jump_support;

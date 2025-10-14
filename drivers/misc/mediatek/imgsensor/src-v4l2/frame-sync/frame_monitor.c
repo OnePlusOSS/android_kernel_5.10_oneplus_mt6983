@@ -9,9 +9,16 @@
 #ifndef FS_UT
 #include <linux/of_platform.h>
 
+#ifndef OPLUS_FEATURE_CAMERA_COMMON
+#define OPLUS_FEATURE_CAMERA_COMMON
+#endif
+
 #ifdef USING_CCU
 #include <linux/remoteproc.h>
 #include <linux/remoteproc/mtk_ccu.h>
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+#include <linux/pm_runtime.h>
+#endif // OPLUS_FEATURE_CAMERA_COMMON
 #endif // USING_CCU
 
 #ifdef USING_N3D
@@ -104,6 +111,9 @@ struct FrameMonitorInst {
 	struct platform_device *ccu_pdev;
 	phandle handle;
 	int power_on_cnt;
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+	struct platform_device *pdevs[FM_TG_CNT];
+#endif // OPLUS_FEATURE_CAMERA_COMMON
 #endif // USING_CCU
 #endif // FS_UT
 
@@ -318,6 +328,55 @@ static unsigned int query_ccu_vsync_data(struct vsync_rec (*pData))
 
 	return ret;
 }
+
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+#ifndef FS_UT
+static void frm_pm_runtime_ctrl(const unsigned int tg, const unsigned int flag)
+{
+	struct platform_device *pdev;
+	struct device *dev;
+	unsigned int idx = tg;
+	int ret;
+
+	if (unlikely(idx >= FM_TG_CNT))
+		return;
+	pdev = frm_inst.pdevs[idx];
+
+	/* need NOT to handle */
+	if (pdev == NULL)
+		return;
+	dev = &pdev->dev;
+
+	if (flag) {
+		ret = pm_runtime_get_sync(dev);
+		if (unlikely(ret < 0)) {
+			pm_runtime_put_noidle(dev);
+			LOG_MUST(
+				"ERROR: called (pdev:%s) pm_runtime_get_sync failed, ret:%d => put nodile  [tg:%u <=> pdev idx:%u]\n",
+				pdev->name, ret, tg, idx);
+		} else {
+			LOG_MUST(
+				"NOTICE: called (pdev:%s) pm_runtime_get_sync, ret:%d  [tg:%u <=> pdev idx:%u]\n",
+				pdev->name, ret, tg, idx);
+		}
+	} else {
+		ret = pm_runtime_put_sync(dev);
+		if (unlikely(ret < 0)) {
+			pm_runtime_get_noresume(dev);
+			LOG_MUST(
+				"ERROR: called (pdev:%s) pm_runtime_put_sync failed, ret:%d => get noresume  [tg:%u <=> pdev idx:%u]\n",
+				pdev->name, ret, tg, idx);
+		} else {
+			LOG_MUST(
+				"NOTICE: called (pdev:%s) pm_runtime_put_sync, ret:%d  [tg:%u <=> pdev idx:%u]\n",
+				pdev->name, ret, tg, idx);
+		}
+		/* clear dev */
+		// frm_inst.devs[idx] = NULL;
+	}
+}
+#endif
+#endif // OPLUS_FEATURE_CAMERA_COMMON
 #endif // USING_CCU
 /******************************************************************************/
 
@@ -725,6 +784,10 @@ void frm_reset_ccu_vsync_timestamp(unsigned int idx, unsigned int en)
 			return;
 	}
 
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+	if (en > 0)
+		frm_pm_runtime_ctrl(tg, 1);
+#endif // OPLUS_FEATURE_CAMERA_COMMON
 	/* call CCU to reset vsync timestamp */
 	ret = mtk_ccu_rproc_ipc_send(
 		frm_inst.ccu_pdev,
@@ -743,6 +806,13 @@ void frm_reset_ccu_vsync_timestamp(unsigned int idx, unsigned int en)
 		LOG_MUST(
 			"called CCU reset(1)/clear(0):%u, tg:%u (selbits:%u) vsync data, ret:%u\n",
 			en, tg, selbits, ret);
+
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+#ifndef FS_UT
+	if (en == 0)
+		frm_pm_runtime_ctrl(tg, 0);
+#endif
+#endif // OPLUS_FEATURE_CAMERA_COMMON
 }
 
 
@@ -1008,9 +1078,15 @@ static int frm_get_mraw_id(unsigned int id)
 static int frm_get_camsv_id(unsigned int id)
 {
 #if !defined(FS_UT)
-
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+	struct platform_device *pdev = NULL;
+#endif // OPLUS_FEATURE_CAMERA_COMMON
 	struct device_node *dev_node = NULL;
+#ifndef OPLUS_FEATURE_CAMERA_COMMON
 	unsigned int camsv_id, cammux_id;
+#else // OPLUS_FEATURE_CAMERA_COMMON
+	unsigned int camsv_id, cammux_id, ccu_tg_id;
+#endif // OPLUS_FEATURE_CAMERA_COMMON
 	int ret = -1;
 
 	do {
@@ -1028,6 +1104,22 @@ static int frm_get_camsv_id(unsigned int id)
 
 			if (cammux_id == (id - 1)) {
 				ret = camsv_id;
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+				ccu_tg_id = camsv_id + CAMSV_TG_MIN;
+				pdev = of_find_device_by_node(dev_node);
+				if (unlikely(pdev == NULL)) {
+					LOG_MUST(
+						"ERROR: of find device by node failed, camsv_id:%d\n",
+						camsv_id);
+				} else {
+					frm_inst.pdevs[ccu_tg_id] = pdev;
+					LOG_MUST(
+						"NOTICE: get & keep pdevs[%u]:(%s) for camsv-id:%d\n",
+						ccu_tg_id,
+						frm_inst.pdevs[ccu_tg_id]->name,
+						camsv_id);
+				}
+#endif // OPLUS_FEATURE_CAMERA_COMMON
 				break;
 			}
 		}

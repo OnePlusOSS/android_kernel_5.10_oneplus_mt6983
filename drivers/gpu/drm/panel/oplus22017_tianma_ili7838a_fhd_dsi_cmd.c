@@ -931,6 +931,77 @@ static int panel_set_aod_light_mode(void *dsi, dcs_write_gce cb, void *handle, u
 
 	return 0;
 }
+static int oplus_lcm_dcs_read(struct lcm *ctx, u8 cmd, void *data, size_t len)
+{
+	struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
+	ssize_t ret;
+
+	if (ctx->error < 0)
+		return 0;
+
+	ret = mipi_dsi_dcs_read(dsi, cmd, data, len);
+	if (ret < 0) {
+		DISP_ERR("error %ld reading dcs seq:(%#x)\n", ret, cmd);
+		ctx->error = ret;
+	}
+
+	return ret;
+}
+
+static void oplus_lcm_panel_get_data(struct lcm *ctx)
+{
+	u8 buffer[3] = { 0 };
+	static int ret;
+
+	ret = oplus_lcm_dcs_read(ctx, 0x0A, buffer, 1);
+	DISP_INFO("0x0A return %d data(0x%08x) to dsi engine\n",ret, buffer[0] | (buffer[1] << 8));
+	ret = oplus_lcm_dcs_read(ctx, 0x0E, buffer, 1);
+	DISP_INFO("return 0x0E %d data(0x%08x) to dsi engine\n",ret, buffer[0] | (buffer[1] << 8));
+
+}
+
+void lcm_read_info(struct drm_panel *panel, int read_ic)
+{
+	unsigned int ret = 0;
+	struct lcm *ctx = panel_to_lcm(panel);
+	/* VCI LDO GPIO enable */
+	if (IS_ERR(ctx->vci_enable_gpio))
+		DISP_ERR("get vci enable gpio failed\n");
+	else {
+		ret = gpiod_get_value(ctx->vci_enable_gpio);
+		DISP_INFO("vci_enable_gpio = %d\n", ret);
+	}
+
+	/* vcore 1p2 GPIO enable */
+	if (IS_ERR(ctx->vddr_aod_enable_gpio))
+		DISP_ERR("get vddr_aod gpio failed\n");
+	else {
+		ret = gpiod_get_value(ctx->vddr_aod_enable_gpio);
+		DISP_INFO("vddr_aod_gpio = %d\n", ret);
+	}
+
+	/* vddr1p5 GPIO enable */
+	if (IS_ERR(ctx->vddr1p5_enable_gpio))
+		DISP_ERR("get vddr1p5 gpio failed\n");
+	else {
+		ret = gpiod_get_value(ctx->vddr1p5_enable_gpio);
+		DISP_INFO("vddr1p5_gpio = %d\n", ret);
+	}
+
+	/* Reset GPIO enable */
+	if (IS_ERR(ctx->reset_gpio))
+		DISP_ERR("get reset gpio failed\n");
+	else {
+		ret = gpiod_get_value(ctx->reset_gpio);
+		DISP_INFO("reset_gpio = %d\n", ret);
+	}
+	pr_info("read_ic = %d\n", read_ic);
+	/* DDIC register detect */
+	if (read_ic > 0) {
+		oplus_lcm_panel_get_data(ctx);
+	}
+	return;
+}
 
 static int lcm_panel_poweron(struct drm_panel *panel)
 {
@@ -1126,6 +1197,7 @@ static struct mtk_panel_funcs ext_funcs = {
 	.esd_backlight_recovery = oplus_esd_backlight_recovery,
 	.hbm_set_cmdq = panel_hbm_set_cmdq,
 	.set_hbm = lcm_set_hbm,
+	.oplus_get_info = lcm_read_info,
 	.doze_enable = panel_doze_enable,
 	.doze_disable = panel_doze_disable,
 	.set_aod_light_mode = panel_set_aod_light_mode,

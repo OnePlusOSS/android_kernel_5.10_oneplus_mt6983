@@ -9,8 +9,8 @@
 * <version>           <date>                <author>                            <desc>
 ***********************************************************************************/
 
-#ifndef _OPPO_HEALTHINFO_H_
-#define _OPPO_HEALTHINFO_H_
+#ifndef _OPLUS_HEALTHINFO_H_
+#define _OPLUS_HEALTHINFO_H_
 
 #include <linux/latencytop.h>
 #include <linux/sched.h>
@@ -22,9 +22,9 @@
 #include <linux/slab.h>
 #include <linux/oplus_healthinfo/oplus_fg.h>
 
-#ifdef CONFIG_OPPO_MEM_MONITOR
+#ifdef CONFIG_OPLUS_MEM_MONITOR
 #include <linux/oplus_healthinfo/memory_monitor.h>
-#endif /*CONFIG_OPPO_MEM_MONITOR*/
+#endif /*CONFIG_OPLUS_MEM_MONITOR*/
 
 #define ohm_err(fmt, ...) \
         printk(KERN_ERR "[OHM_ERR][%s]"fmt, __func__, ##__VA_ARGS__)
@@ -96,5 +96,5 @@ extern void ohm_schedstats_record(int sched_type, struct task_struct *task, u64 
 extern int ohm_get_cur_cpuload(bool ctrl);
 extern void ohm_action_trig_with_msg(int type, char *msg);
 
-#endif /* _OPPO_HEALTHINFO_H_*/
+#endif /* _OPLUS_HEALTHINFO_H_*/
 

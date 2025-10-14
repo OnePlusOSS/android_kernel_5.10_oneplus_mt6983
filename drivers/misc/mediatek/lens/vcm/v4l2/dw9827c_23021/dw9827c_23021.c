@@ -148,6 +148,9 @@ static int dw9827c_23021_release(struct dw9827c_23021_device *dw9827c_23021)
 
 	i2c_smbus_write_byte_data(client, 0x02, 0x20);
 	dw9827c_23021->active = false;
+
+	usleep_range(5000, 5000 + 1000);
+
 	LOG_INF("-\n");
 
 	return 0;
@@ -179,19 +182,32 @@ static int dw9827c_23021_init(struct dw9827c_23021_device *dw9827c_23021)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(&dw9827c_23021->sd);
 	int ret = 0;
-
+	u8 value = 0xFF;
 	LOG_INF("+\n");
+   	client->addr = DW9827C_23021_I2C_SLAVE_ADDR >> 1;
 
-	client->addr = DW9827C_23021_I2C_SLAVE_ADDR >> 1;
-	ret = i2c_smbus_read_byte_data(client, 0x02);
+	i2c_smbus_write_byte_data(client, 0x02, 0x40);//standby
+	usleep_range(3 * 1000, 3 * 1000 + 1000);
+	value = i2c_smbus_read_byte_data(client, 0x7D);
+	LOG_INF("States standby(0x7D) = 0x%x\n", value);
 
-	LOG_INF("Check HW version: %x\n", ret);
+   	if(value != 0x00) {
+		i2c_smbus_write_byte_data(client, 0x02, 0x40);//standby
+		usleep_range(5 * 1000, 5 * 1000 + 1000);
+		i2c_smbus_write_byte_data(client, 0x34, 0x85);//pt off
+		i2c_smbus_write_byte_data(client, 0x7D, 0x00);// States standby
+		i2c_smbus_write_byte_data(client, 0x95, 0x00);// SAL OFF
+		i2c_smbus_write_byte_data(client, 0x03, 0x01);// store
+		usleep_range(10 * 1000, 10 * 1000 + 1000);
+		i2c_smbus_write_byte_data(client, 0x34, 0x52);// pt on
+		i2c_smbus_write_byte_data(client, 0x04, 0x01);// sw reset
+		usleep_range(5 * 1000, 5 * 1000 + 1000);
+	}
 
-	ret = i2c_smbus_read_byte_data(client, 0x03);
+	value = i2c_smbus_read_byte_data(client, 0x03);
+	LOG_INF("product_id: %x\n", value);
 
-	LOG_INF("product_id: %x\n", ret);
-
-	LOG_INF("dw9827c_23021_init ret: %d", ret);
+	LOG_INF("dw9827c_23021_init value: %d", value);
 
 	ret = dw9827c_23021_write_array(dw9827c_23021, dw9827c_23021_init_regs,
                     ARRAY_SIZE(dw9827c_23021_init_regs));

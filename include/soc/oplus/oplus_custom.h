@@ -4,12 +4,12 @@
  *
  *
  */
-#ifndef _OPPO_CUSTOME_H_
-#define _OPPO_CUSTOME_H_
+#ifndef _OPLUS_CUSTOME_H_
+#define _OPLUS_CUSTOME_H_
 
 //must same as perload define
-#define D_OPPO_CUST_PART_MAGIC_NUM              (0x6F70706F)
-#define D_OPPO_CUST_PART_CONFIG_MAGIC_NUM       (0x636F6E66)
+#define D_OPLUS_CUST_PART_MAGIC_NUM              (0x6F70706F)
+#define D_OPLUS_CUST_PART_CONFIG_MAGIC_NUM       (0x636F6E66)
 
 #define PROJECT_BUF_SIZE 64
 #define SENSOR_BUF_SIZE 256

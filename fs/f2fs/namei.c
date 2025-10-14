@@ -85,7 +85,10 @@ static struct inode *f2fs_new_inode(struct inode *dir, umode_t mode)
 
 	if (f2fs_sb_has_extra_attr(sbi)) {
 		set_inode_flag(inode, FI_EXTRA_ATTR);
-		F2FS_I(inode)->i_extra_isize = F2FS_TOTAL_EXTRA_ATTR_SIZE;
+		if (sbi->oplus_feats & OPLUS_FEAT_DEDUP)
+			F2FS_I(inode)->i_extra_isize = F2FS_TOTAL_EXTRA_ATTR_SIZE;
+		else
+			F2FS_I(inode)->i_extra_isize = F2FS_LEGACY_EXTRA_ATTR_SIZE;
 	}
 
 	if (test_opt(sbi, INLINE_XATTR))
@@ -645,16 +648,6 @@ static int f2fs_unlink(struct inode *dir, struct dentry *dentry)
 		d_invalidate(dentry);
 #endif
 
-#ifdef CONFIG_F2FS_FS_COMPRESSION_FIXED_OUTPUT
-	if (f2fs_compressed_file(inode) &&
-	    delayed_work_pending(&F2FS_I(inode)->release_dwork)) {
-		bool pending;
-		pending = cancel_delayed_work_sync(&F2FS_I(inode)->release_dwork);
-		if (pending)
-			iput(inode);
-	}
-#endif
-
 	if (IS_DIRSYNC(dir))
 		f2fs_sync_fs(sbi->sb, 1);
 fail:
@@ -1095,7 +1088,7 @@ static int f2fs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	}
 
 	if (old_dir_entry) {
-		if (old_dir != new_dir && !whiteout)
+		if (old_dir != new_dir)
 			f2fs_set_link(old_inode, old_dir_entry,
 						old_dir_page, new_dir);
 		else

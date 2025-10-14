@@ -1780,10 +1780,14 @@ static kal_uint32 set_test_pattern_mode(kal_bool enable)
 {
 	pr_debug("enable: %d\n", enable);
 
-	if (enable)
+	if (enable) {
 		write_cmos_sensor_8bit(0x008c, 0x01);
-	else
+		write_cmos_sensor_8bit(0x008d, 0x00);
+	}
+	else {
 		write_cmos_sensor_8bit(0x008c, 0x00);
+		write_cmos_sensor_8bit(0x008d, 0x10);
+	}
 
 	spin_lock(&imgsensor_drv_lock);
 	imgsensor.test_pattern = enable;

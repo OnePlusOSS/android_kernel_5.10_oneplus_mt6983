@@ -5627,9 +5627,9 @@ static void mtk_dsi_cmdq(struct mtk_dsi *dsi, const struct mipi_dsi_msg *msg)
 		mtk_dsi_mask(dsi, goto_addr & (~(0x3UL)),
 			     (0xFFu << ((goto_addr & 0x3u) * 8)),
 			     tx_buf[i] << ((goto_addr & 0x3u) * 8));
-		//DDPDBG("%s crtc%u dsi%u, set cmdqaddr %lx, val:%x, mask %x\n", __func__,
-		//		crtc_index, dsi->ddp_comp.id, goto_addr, tx_buf[i] << ((goto_addr & 0x3u) * 8),
-		//		(0xFFu << ((goto_addr & 0x3u) * 8)));
+		DDPINFO("%s crtc%u dsi%u, set cmdqaddr %lx, val:%x, mask %x\n", __func__,
+				crtc_index, dsi->ddp_comp.id, goto_addr, tx_buf[i] << ((goto_addr & 0x3u) * 8),
+				(0xFFu << ((goto_addr & 0x3u) * 8)));
 	}
 	if (msg->tx_len > 2)
 		cmdq_mask = CONFIG | DATA_ID | DATA_0 | DATA_1;
@@ -7422,7 +7422,11 @@ static ssize_t mtk_dsi_host_send_cmd(struct mtk_dsi *dsi,
 		s32 tmp;
 
 		udelay(1);
+	#ifdef OPLUS_FEATURE_DISPLAY
+		while (loop_cnt < 30 * 1000) {
+	#else
 		while (loop_cnt < 100 * 1000) {
+	#endif
 			tmp = readl(dsi->regs + DSI_INTSTA);
 			if ((tmp & LPRX_RD_RDY_INT_FLAG))
 				break;
@@ -9590,6 +9594,14 @@ static int mtk_dsi_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 		break;
 	}
 /* #endif */ /* OPLUS_FEATURE_ONSCREENFINGERPRINT */
+	case OPLUS_GET_INFO:
+	{
+		panel_ext = mtk_dsi_get_panel_ext(comp);
+		if (panel_ext && panel_ext->funcs
+			&& panel_ext->funcs->oplus_get_info)
+			panel_ext->funcs->oplus_get_info(dsi->panel, *((int *)params));
+	}
+		break;
 	case DSI_HBM_SET:
 	{
 		panel_ext = mtk_dsi_get_panel_ext(comp);

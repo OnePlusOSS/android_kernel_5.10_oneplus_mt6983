@@ -223,6 +223,7 @@
 	qcom,new_ui_warning_support;
 	qcom,ffc_support;
 	qcom,dual_ffc;
+	oplus,aging_ffc_version = <1>;
 	recharge_after_full;
 	qcom,wireless_support;
 

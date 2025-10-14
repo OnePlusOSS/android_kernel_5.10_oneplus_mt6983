@@ -1,5 +1,5 @@
-#ifndef _OPPO_PROJECT_H_
-#define _OPPO_PROJECT_H_
+#ifndef _OPLUS_PROJECT_H_
+#define _OPLUS_PROJECT_H_
 #include "oplus_project_data_ocdt.h"
 #include "oplus_project_oldcdt.h"
 
@@ -37,11 +37,11 @@ unsigned int is_new_cdt(void);
 //cdt interface for Q or R
 unsigned int get_project(void);
 unsigned int is_project(int project);
-unsigned int get_Oppo_Boot_Mode(void);
+unsigned int get_oplus_Boot_Mode(void);
 unsigned int get_PCB_Version(void);
 unsigned int get_audio(void);
 unsigned int get_dtsiNo(void);
-uint32_t get_oppo_feature(enum F_INDEX index);
+uint32_t get_oplus_feature(enum F_INDEX index);
 
 //cdt interface for P->R
 int32_t get_Modem_Version(void);

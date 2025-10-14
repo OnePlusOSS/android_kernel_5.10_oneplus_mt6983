@@ -911,17 +911,17 @@ static blk_status_t sd_setup_unmap_cmnd(struct scsi_cmnd *cmd)
 	struct scsi_device *sdp = cmd->device;
 	struct request *rq = cmd->request;
 	struct scsi_disk *sdkp = scsi_disk(rq->rq_disk);
-#ifdef CONFIG_SCSI_BATCH_UNMAP
-	unsigned short segments = blk_rq_nr_discard_segments(rq);
-	unsigned int data_len = 8 + 16 * segments;
-	unsigned int descriptor_offset = 8;
-	struct bio *bio;
-#else
 	u64 lba = sectors_to_logical(sdp, blk_rq_pos(rq));
 	u32 nr_blocks = sectors_to_logical(sdp, blk_rq_sectors(rq));
 	unsigned int data_len = 24;
-#endif
 	char *buf;
+
+#ifdef CONFIG_SCSI_BATCH_UNMAP
+	unsigned short segments = blk_rq_nr_discard_segments(rq);
+	unsigned int descriptor_offset = 8;
+	struct bio *bio;
+	data_len = 8 + 16 * segments;
+#endif
 
 	rq->special_vec.bv_page = mempool_alloc(sd_page_pool, GFP_ATOMIC);
 	if (!rq->special_vec.bv_page)
@@ -931,9 +931,10 @@ static blk_status_t sd_setup_unmap_cmnd(struct scsi_cmnd *cmd)
 	rq->special_vec.bv_len = data_len;
 	rq->rq_flags |= RQF_SPECIAL_PAYLOAD;
 
-#ifdef CONFIG_SCSI_BATCH_UNMAP
 	cmd->cmd_len = 10;
 	cmd->cmnd[0] = UNMAP;
+
+#ifdef CONFIG_SCSI_BATCH_UNMAP
 	cmd->cmnd[7] = data_len>>8;
 	cmd->cmnd[8] = data_len & 0xff;
 
@@ -941,17 +942,22 @@ static blk_status_t sd_setup_unmap_cmnd(struct scsi_cmnd *cmd)
 	put_unaligned_be16(6 + 16 * segments, &buf[0]);
 	put_unaligned_be16(16 * segments, &buf[2]);
 
-	__rq_for_each_bio(bio, rq) {
-		u64 lba = sectors_to_logical(sdp, bio->bi_iter.bi_sector);
-		u32 nr_blocks = sectors_to_logical(sdp, bio_sectors(bio));
+	/* only device support fastdiscard can execute multi-UNMAP descriptor correctly */
+	if (blk_queue_reserve_device(rq->q)) {
+		__rq_for_each_bio(bio, rq) {
+			lba = sectors_to_logical(sdp, bio->bi_iter.bi_sector);
+			nr_blocks = sectors_to_logical(sdp, bio_sectors(bio));
 
-		put_unaligned_be64(lba, &buf[descriptor_offset]);
-		put_unaligned_be32(nr_blocks, &buf[descriptor_offset + 8]);
-		descriptor_offset += 16;
+			put_unaligned_be64(lba, &buf[descriptor_offset]);
+			put_unaligned_be32(nr_blocks, &buf[descriptor_offset + 8]);
+			descriptor_offset += 16;
+		}
+	} else {
+		WARN_ON(segments > 1);
+		put_unaligned_be64(lba, &buf[8]);
+		put_unaligned_be32(nr_blocks, &buf[16]);
 	}
 #else
-	cmd->cmd_len = 10;
-	cmd->cmnd[0] = UNMAP;
 	cmd->cmnd[8] = 24;
 
 	buf = page_address(rq->special_vec.bv_page);

@@ -182,6 +182,9 @@ struct f2fs_rwsem {
         wait_queue_head_t read_waiters;
 };
 
+#define OPLUS_FEAT_COMPR	0x1
+#define OPLUS_FEAT_DEDUP	0x2
+
 struct f2fs_mount_info {
 	unsigned int opt;
 	int write_io_size_bits;		/* Write IO size bits */
@@ -958,9 +961,6 @@ struct f2fs_inode_info {
 	struct fi_merge_manage *i_boostfile; /* boostfile merge info */
 	atomic_t appboost_abort;
 #endif
-#ifdef CONFIG_F2FS_FS_COMPRESSION_FIXED_OUTPUT
-	struct delayed_work release_dwork;
-#endif
 
 #ifdef CONFIG_F2FS_FS_DEDUP
 	struct inode *inner_inode;
@@ -1357,7 +1357,6 @@ struct f2fs_dev_info {
 #ifdef CONFIG_BLK_DEV_ZONED
 	unsigned int nr_blkz;		/* Total number of zones */
 	unsigned long *blkz_seq;	/* Bitmap indicating sequential zones */
-	block_t *zone_capacity_blocks;  /* Array of zone capacity in blks */
 #endif
 };
 
@@ -1425,6 +1424,7 @@ enum {
 	GC_IDLE_AT,
 	GC_URGENT_HIGH,
 	GC_URGENT_LOW,
+	GC_URGENT_MID,
 	MAX_GC_MODE,
 };
 
@@ -1762,7 +1762,7 @@ static void inline deserialize_decompress_index(decompress_index_t val,
 	di->ofs = (val & (0xfff << DI_OFS_OFFS)) >> DI_OFS_OFFS;
 }
 
-#define MAX_BLKS_PER_CLUSTER		(1 << 8) // MAX_COMPRESS_LOG_SIZE
+#define MAX_BLKS_PER_CLUSTER		(1 << 3) // MAX_COMPRESS_LOG_SIZE
 
 #define CLEAR_IFLAG_IF_SET(inode, flag)                                        \
 	if (F2FS_I(inode)->i_flags & flag) {                                   \
@@ -1811,11 +1811,11 @@ struct decompress_io_ctx {
 	pgoff_t cluster_idx;		/* cluster index number */
 	unsigned int cluster_size;	/* page count in cluster */
 	unsigned int log_cluster_size;	/* log of cluster size */
-	struct page **rpages;		/* pages store raw data in cluster */
+	struct page *rpages[MAX_BLKS_PER_CLUSTER];		/* pages store raw data in cluster */
 	unsigned int nr_rpages;		/* total page number in rpages */
-	struct page **cpages;		/* pages store compressed data in cluster */
+	struct page *cpages[MAX_BLKS_PER_CLUSTER];		/* pages store compressed data in cluster */
 	unsigned int nr_cpages;		/* total page number in cpages */
-	struct page **tpages;		/* temp pages to pad holes in cluster */
+	struct page *tpages[MAX_BLKS_PER_CLUSTER];		/* temp pages to pad holes in cluster */
 	void *rbuf;			/* virtual mapped address on rpages */
 	struct compress_data *cbuf;	/* virtual mapped address on cpages */
 	size_t rlen;			/* valid data length in rbuf */
@@ -1942,6 +1942,7 @@ struct f2fs_sb_info {
 	unsigned int meta_ino_num;		/* meta inode number*/
 	unsigned int log_blocks_per_seg;	/* log2 blocks per segment */
 	unsigned int blocks_per_seg;		/* blocks per segment */
+	unsigned int unusable_blocks_per_sec;	/* unusable blocks per section */
 	unsigned int segs_per_sec;		/* segments per section */
 	unsigned int secs_per_zone;		/* sections per zone */
 	unsigned int total_sections;		/* total section count */
@@ -2104,13 +2105,11 @@ struct f2fs_sb_info {
 	bool device_copy_enable;
 #endif
 
+	unsigned int oplus_feats;
+
 #ifdef CONFIG_F2FS_APPBOOST
 	int appboost;
 	unsigned int appboost_max_blocks;
-#endif
-
-#ifdef CONFIG_F2FS_FS_COMPRESSION_FIXED_OUTPUT
-	struct workqueue_struct *delay_release_wq;
 #endif
 };
 
@@ -3071,6 +3070,9 @@ static inline bool is_idle(struct f2fs_sb_info *sbi, int type)
 	if (is_inflight_io(sbi, type))
 		return false;
 
+	if (sbi->gc_mode == GC_URGENT_MID)
+		return true;
+
 	if (sbi->gc_mode == GC_URGENT_LOW &&
 			(type == DISCARD_TIME || type == GC_TIME))
 		return true;
@@ -3266,7 +3268,7 @@ static inline void __mark_inode_dirty_flag(struct inode *inode,
 	case FI_DOING_DEDUP:
 	case FI_META_UN_MODIFY:
 	case FI_DATA_UN_MODIFY:
-#ifdef CONFIG_F2FS_APPNBOOST
+#ifdef CONFIG_F2FS_APPBOOST
 	case FI_MERGED_FILE:
 #endif
 #endif
@@ -3858,7 +3860,11 @@ static inline int get_inline_xattr_addrs(struct inode *inode)
 
 #define F2FS_TOTAL_EXTRA_ATTR_SIZE			\
 	(offsetof(struct f2fs_inode, i_extra_end) -	\
-	offsetof(struct f2fs_inode, i_extra_isize))	\
+	offsetof(struct f2fs_inode, i_extra_isize))
+#define F2FS_LEGACY_EXTRA_ATTR_SIZE			\
+	(offsetof(struct f2fs_inode, i_compress_flag) -	\
+	offsetof(struct f2fs_inode, i_extra_isize) +	\
+	sizeof(__le16))
 
 #define F2FS_OLD_ATTRIBUTE_SIZE	(offsetof(struct f2fs_inode, i_addr))
 #define F2FS_FITS_IN_INODE(f2fs_inode, extra_isize, field)		\
@@ -3956,7 +3962,6 @@ bool f2fs_enable_device_copy(struct f2fs_sb_info *sbi);
 #ifdef CONFIG_F2FS_FS_COMPRESSION_FIXED_OUTPUT
 int f2fs_reserve_compress_blocks(struct inode *inode, unsigned int *ret_rsvd_blks);
 int f2fs_decompress_inode(struct inode *inode);
-void f2fs_delay_release_compress_blocks(struct inode *inode);
 #endif
 
 #ifdef CONFIG_F2FS_FS_DEDUP
@@ -4336,7 +4341,7 @@ block_t f2fs_start_bidx_of_node(unsigned int node_ofs, struct inode *inode);
 int f2fs_gc(struct f2fs_sb_info *sbi, bool sync, bool background, bool force,
 			unsigned int segno);
 void f2fs_build_gc_manager(struct f2fs_sb_info *sbi);
-int f2fs_resize_fs(struct f2fs_sb_info *sbi, __u64 block_count);
+int f2fs_resize_fs(struct file *filp, __u64 block_count);
 int __init f2fs_create_garbage_collection_cache(void);
 void f2fs_destroy_garbage_collection_cache(void);
 
@@ -4728,6 +4733,8 @@ unsigned int f2fs_shrink_age_extent_tree(struct f2fs_sb_info *sbi,
 /*
  * sysfs.c
  */
+#define MIN_RA_MUL	2
+
 int __init f2fs_init_sysfs(void);
 void f2fs_exit_sysfs(void);
 int f2fs_register_sysfs(struct f2fs_sb_info *sbi);
@@ -4880,10 +4887,16 @@ static inline void f2fs_update_read_extent_tree_range_compressed(
 				unsigned int llen, unsigned int c_len) { }
 #endif
 
+extern bool may_compress;
+extern bool may_set_compr_fl;
+
 static inline int set_compress_context(struct inode *inode)
 {
 #ifdef CONFIG_F2FS_FS_COMPRESSION
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
+
+	if (!may_compress)
+		return -EOPNOTSUPP;
 
 	F2FS_I(inode)->i_compress_algorithm =
 			F2FS_OPTION(sbi).compress_algorithm;
@@ -4949,10 +4962,22 @@ F2FS_FEATURE_FUNCS(lost_found, LOST_FOUND);
 F2FS_FEATURE_FUNCS(verity, VERITY);
 F2FS_FEATURE_FUNCS(sb_chksum, SB_CHKSUM);
 F2FS_FEATURE_FUNCS(casefold, CASEFOLD);
+#ifndef CONFIG_F2FS_FS_COMPRESSION_FIXED_OUTPUT
 F2FS_FEATURE_FUNCS(compression, COMPRESSION);
+#else
+static inline bool f2fs_sb_has_compression(struct f2fs_sb_info *sbi)
+{
+	return F2FS_HAS_FEATURE(sbi, F2FS_FEATURE_COMPRESSION) &&
+		(sbi->oplus_feats & OPLUS_FEAT_COMPR);
+}
+#endif
 F2FS_FEATURE_FUNCS(readonly, RO);
 #ifdef CONFIG_F2FS_FS_DEDUP
-F2FS_FEATURE_FUNCS(dedup, DEDUP);
+static inline bool f2fs_sb_has_dedup(struct f2fs_sb_info *sbi)
+{
+	return F2FS_HAS_FEATURE(sbi, F2FS_FEATURE_DEDUP) &&
+		(sbi->oplus_feats & OPLUS_FEAT_DEDUP);
+}
 #endif
 
 #ifdef CONFIG_BLK_DEV_ZONED
@@ -5094,16 +5119,6 @@ static inline bool f2fs_force_buffered_io(struct inode *inode,
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
 	int rw = iov_iter_rw(iter);
 
-#ifdef CONFIG_DEVICE_XCOPY
-	/* seems read lock is better, but defragment does not fetch write */
-	f2fs_down_write(&F2FS_I(inode)->i_gc_rwsem[WRITE]);
-	if (atomic_read(&F2FS_I(inode)->file_xcopy_cnt) != 0) {
-		f2fs_up_write(&F2FS_I(inode)->i_gc_rwsem[WRITE]);
-		return true;
-	}
-	f2fs_up_write(&F2FS_I(inode)->i_gc_rwsem[WRITE]);
-#endif
-
 	if (!fscrypt_dio_supported(iocb, iter))
 		return true;
 	if (fsverity_active(inode))
@@ -5154,6 +5169,22 @@ static inline bool is_journalled_quota(struct f2fs_sb_info *sbi)
 		return true;
 #endif
 	return false;
+}
+
+static inline void f2fs_truncate_meta_inode_pages(struct f2fs_sb_info *sbi,
+					block_t blkaddr, unsigned int cnt)
+{
+	f2fs_submit_merged_write_cond(sbi, sbi->meta_inode, NULL, 0, DATA);
+	truncate_inode_pages_range(META_MAPPING(sbi),
+			F2FS_BLK_TO_BYTES((loff_t)blkaddr),
+			F2FS_BLK_END_BYTES((loff_t)(blkaddr + cnt - 1)));
+}
+
+static inline void f2fs_invalidate_internal_cache(struct f2fs_sb_info *sbi,
+								block_t blkaddr)
+{
+	f2fs_truncate_meta_inode_pages(sbi, blkaddr, 1);
+	f2fs_invalidate_compress_page(sbi, blkaddr);
 }
 
 #define EFSBADCRC	EBADMSG		/* Bad CRC detected */

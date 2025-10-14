@@ -387,6 +387,11 @@ static struct mml_frame_config *frame_config_create(
 	if (!cfg)
 		return ERR_PTR(-ENOMEM);
 	mml_core_init_config(cfg);
+	if (!cfg->wq_done) {
+		mml_err("[drm] fail to alloc wq_done\n");
+		kfree(cfg);
+		return ERR_PTR(-ENOMEM);
+	}
 
 	list_add(&cfg->entry, &ctx->configs);
 	ctx->config_cnt++;
@@ -1184,6 +1189,24 @@ static struct mml_drm_ctx *drm_ctx_create(struct mml_dev *mml,
 	ctx->panel_pixel = MML_DEFAULT_PANEL_PX;
 	ctx->wq_config[0] = alloc_ordered_workqueue("mml_work0", WORK_CPU_UNBOUND | WQ_HIGHPRI, 0);
 	ctx->wq_config[1] = alloc_ordered_workqueue("mml_work1", WORK_CPU_UNBOUND | WQ_HIGHPRI, 0);
+
+	if (!ctx->wq_destroy || !ctx->wq_config[0] || !ctx->wq_config[1]) {
+		mml_err("[drm] fail to alloc workqueue\n");
+		if (ctx->wq_destroy) {
+			destroy_workqueue(ctx->wq_destroy);
+			ctx->wq_destroy = NULL;
+		}
+		if (ctx->wq_config[0]) {
+			destroy_workqueue(ctx->wq_config[0]);
+			ctx->wq_config[0] = NULL;
+		}
+		if (ctx->wq_config[1]) {
+			destroy_workqueue(ctx->wq_config[1]);
+			ctx->wq_config[1] = NULL;
+		}
+		kfree(ctx);
+		return ERR_PTR(-ENOMEM);
+	}
 
 	ctx->timeline = mtk_sync_timeline_create("mml_timeline");
 	if (!ctx->timeline)

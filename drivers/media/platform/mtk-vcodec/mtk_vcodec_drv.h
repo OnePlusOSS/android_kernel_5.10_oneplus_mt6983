@@ -688,6 +688,7 @@ struct mtk_vcodec_dev {
 	struct mutex log_param_mutex;
 	struct mutex prop_param_mutex;
 	enum venc_lock enc_hw_locked[MTK_VENC_HW_NUM];
+	struct mutex enc_hw_mutex;
 
 	unsigned int svp_mtee;
 	unsigned int unique_domain;

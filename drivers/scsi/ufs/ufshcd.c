@@ -736,16 +736,6 @@ static inline void ufshcd_utmrl_clear(struct ufs_hba *hba, u32 pos)
 }
 
 /**
- * ufshcd_outstanding_req_clear - Clear a bit in outstanding request field
- * @hba: per adapter instance
- * @tag: position of the bit to be cleared
- */
-static inline void ufshcd_outstanding_req_clear(struct ufs_hba *hba, int tag)
-{
-	clear_bit(tag, &hba->outstanding_reqs);
-}
-
-/**
  * ufshcd_get_lists_status - Check UCRDY, UTRLRDY and UTMRLRDY
  * @reg: Register value of host controller status
  *
@@ -2888,15 +2878,20 @@ static int ufshcd_wait_for_dev_cmd(struct ufs_hba *hba,
 		struct ufshcd_lrb *lrbp, int max_timeout)
 {
 	unsigned long time_left = msecs_to_jiffies(max_timeout);
+	unsigned long flags;
+	bool pending;
 	int err;
 retry:
 	time_left = wait_for_completion_timeout(hba->dev_cmd.complete,
 						time_left);
+ 	/* Make sure descriptors are ready before ringing the doorbell */
+ 	wmb();
 	if (likely(time_left)) {
 		/*
-		 * The caller of this function still owns the @lrbp tag so the
-		 * code below does not trigger any race conditions.
-		 */
+		* The completion handler called complete() and the caller of
+		* this function still owns the @lrbp tag so the code below does
+		* not trigger any race conditions.
+		*/
 		hba->dev_cmd.complete = NULL;
 		err = ufshcd_get_tr_ocs(lrbp);
 		if (!err)
@@ -2905,7 +2900,7 @@ retry:
 		err = -ETIMEDOUT;
 		dev_dbg(hba->dev, "%s: dev_cmd request timedout, tag %d\n",
 			__func__, lrbp->task_tag);
-		if (!ufshcd_clear_cmd(hba, 1U << lrbp->task_tag)) {
+		if (ufshcd_clear_cmd(hba, lrbp->task_tag) == 0) {
 			/* successfully cleared the command, retry if needed */
 			err = -EAGAIN;
 			/*
@@ -2913,23 +2908,46 @@ retry:
 			 * clear the task tag bit from the outstanding_reqs
 			 * variable.
 			 */
-			if (test_and_clear_bit(lrbp->task_tag,
-					    &hba->outstanding_reqs)) {
-				hba->dev_cmd.complete = NULL;
-			} else {
+			spin_lock_irqsave(hba->host->host_lock, flags);
+			pending = test_bit(lrbp->task_tag,
+						&hba->outstanding_reqs);
+			if (pending) {
+					hba->dev_cmd.complete = NULL;
+					__clear_bit(lrbp->task_tag,
+							&hba->outstanding_reqs);
+			}
+			spin_unlock_irqrestore(hba->host->host_lock, flags);
+
+			if (!pending) {
 				/*
-				 * A race occurred between this function and the
-				 * completion handler.
-				 */
+				* The completion handler ran while we tried to
+				* clear the command.
+				*/
 				time_left = 1;
 				goto retry;
 			}
 		} else {
-			dev_err(hba->dev, "%s: failed to clear tag %d\n", __func__,
-				lrbp->task_tag);
+			dev_err(hba->dev, "%s: failed to clear tag %d\n",
+				__func__, lrbp->task_tag);
+			spin_lock_irqsave(hba->host->host_lock, flags);
+			pending = test_bit(lrbp->task_tag,
+					   &hba->outstanding_reqs);
+			if (pending)
+				hba->dev_cmd.complete = NULL;
+			spin_unlock_irqrestore(hba->host->host_lock, flags);
+
+			if (!pending) {
+				/*
+				 * The completion handler ran while we tried to
+				 * clear the command.
+				 */
+				time_left = 1;
+				goto retry;
+			}
 		}
-	}
-	return err;
+ 	}
+ 
+ 	return err;
 }
 
 /**
@@ -3498,7 +3516,7 @@ int ufshcd_read_string_desc(struct ufs_hba *hba, u8 desc_index,
 		 */
 		ret = utf16s_to_utf8s(uc_str->uc,
 				      uc_str->len - QUERY_DESC_HDR_SIZE,
-				      UTF16_BIG_ENDIAN, str, ascii_len);
+				      UTF16_BIG_ENDIAN, str, ascii_len - 1);
 
 		/* replace non-printable or non-ASCII characters with spaces */
 		for (i = 0; i < ret; i++)
@@ -7034,11 +7052,6 @@ static int ufshcd_abort(struct scsi_cmnd *cmd)
 		goto release;
 	}
 
-#if IS_ENABLED(CONFIG_MTK_UFS_DEBUG)
-	ufshcd_outstanding_req_clear(hba, tag);
-	scsi_dma_unmap(cmd);
-	lrbp->cmd = NULL;
-#endif
 	/*
 	 * Clear the corresponding bit from outstanding_reqs since the command
 	 * has been aborted successfully.
@@ -7161,6 +7174,20 @@ static int ufshcd_eh_host_reset_handler(struct scsi_cmnd *cmd)
 	struct ufs_hba *hba;
 
 	hba = shost_priv(cmd->device->host);
+
+	/*
+	 * If runtime pm send SSU and got timeout, scsi_error_handler
+	 * stuck at this function to wait for flush_work(&hba->eh_work).
+	 * And ufshcd_err_handler(eh_work) stuck at wait for runtime pm active.
+	 * Do ufshcd_link_recovery instead schedule eh_work can prevent
+	 * dead lock to happen.
+	 */
+	if (hba->pm_op_in_progress) {
+		if (ufshcd_link_recovery(hba))
+			err = FAILED;
+
+		return err;
+	}
 
 	spin_lock_irqsave(hba->host->host_lock, flags);
 	hba->force_reset = true;
@@ -7525,7 +7552,8 @@ static int ufs_get_device_desc(struct ufs_hba *hba)
 
 	}
 
-	if (dev_info->wmanufacturerid == UFS_VENDOR_RESERVE) {
+	if (dev_info->wmanufacturerid == UFS_VENDOR_RESERVE ||
+		dev_info->wmanufacturerid == UFS_VENDOR_PHISON_CUST) {
 		blk_queue_flag_set(QUEUE_FLAG_RESERVE, hba->cmd_queue);
 #ifdef CONFIG_DEVICE_XCOPY
 		if (b_ufs_ext_fet_sup & UFS_DEV_XCOPY_SUP) {
@@ -7539,7 +7567,8 @@ static int ufs_get_device_desc(struct ufs_hba *hba)
 	}
 
 #ifdef CONFIG_SCSI_BATCH_UNMAP
-	if (dev_info->wmanufacturerid == UFS_VENDOR_RESERVE) {
+	if (dev_info->wmanufacturerid == UFS_VENDOR_RESERVE ||
+		dev_info->wmanufacturerid == UFS_VENDOR_PHISON_CUST) {
 		blk_queue_flag_set(QUEUE_FLAG_RESERVE, hba->cmd_queue);
 		if (hba->android_kabi_reserved1 != 0) {
 			struct vendor_box* vendor_box = (struct vendor_box*)hba->android_kabi_reserved1;
@@ -9694,5 +9723,6 @@ module_exit(ufshcd_core_exit);
 MODULE_AUTHOR("Santosh Yaragnavi <santosh.sy@samsung.com>");
 MODULE_AUTHOR("Vinayak Holikatti <h.vinayak@samsung.com>");
 MODULE_DESCRIPTION("Generic UFS host controller driver Core");
+MODULE_SOFTDEP("pre: governor_simpleondemand");
 MODULE_LICENSE("GPL");
 MODULE_VERSION(UFSHCD_DRIVER_VERSION);

@@ -69,6 +69,7 @@
 #include <asm/unistd.h>
 #include <asm/mmu_context.h>
 #include <trace/hooks/mm.h>
+#include <trace/hooks/dtask.h>
 
 #ifdef OPLUS_BUG_STABILITY
 #include <soc/oplus/system/oplus_process.h>
@@ -834,6 +835,7 @@ void __noreturn do_exit(long code)
 		sync_mm_rss(tsk->mm);
 	acct_update_integrals(tsk);
 	group_dead = atomic_dec_and_test(&tsk->signal->live);
+	trace_android_vh_exit_check(current, code, group_dead);
 	if (group_dead) {
 		/*
 		 * If the last thread of global init has exited, panic

@@ -548,7 +548,10 @@ out:
 		ssize_t sz;
 
 		memset(extensions, 0, sizeof(extensions));
-		while ((token = strsep(&name, ",")) != NULL) {
+		while (1) {
+			token = strsep(&name, ",");
+			if (!token)
+				break;
 			sz = strlen(token);
 			if (sz == 0)
 				continue;
@@ -556,6 +559,11 @@ out:
 				return -EINVAL;
 			if (ext_cnt >= COMPRESS_EXT_NUM)
 				return -EINVAL;
+			if (!strcmp(token, "disable")) {
+				memset(extensions, 0, sizeof(extensions));
+				ext_cnt = 0;
+				break;
+			}
 			memcpy(extensions[ext_cnt++], token, sz);
 		}
 
@@ -742,6 +750,13 @@ out:
 			}
 		} else if (t == 2) {
 			sbi->gc_mode = GC_URGENT_LOW;
+		} else if (t == 3) {
+			sbi->gc_mode = GC_URGENT_MID;
+			if (sbi->gc_thread) {
+				sbi->gc_thread->gc_wake = 1;
+				wake_up_interruptible_all(
+					&sbi->gc_thread->gc_wait_queue_head);
+			}
 		} else {
 			return -EINVAL;
 		}
@@ -772,9 +787,9 @@ out:
 	if (!strcmp(a->attr.name, "iostat_period_ms")) {
 		if (t < MIN_IOSTAT_PERIOD_MS || t > MAX_IOSTAT_PERIOD_MS)
 			return -EINVAL;
-		spin_lock(&sbi->iostat_lock);
+		spin_lock_irq(&sbi->iostat_lock);
 		sbi->iostat_period_ms = (unsigned int)t;
-		spin_unlock(&sbi->iostat_lock);
+		spin_unlock_irq(&sbi->iostat_lock);
 		return count;
 	}
 
@@ -958,10 +973,42 @@ static ssize_t f2fs_feature_show(struct f2fs_attr *a,
 	return sprintf(buf, "supported\n");
 }
 
+static ssize_t f2fs_may_compr_show(struct f2fs_attr *a,
+		struct f2fs_sb_info *sbi, char *buf)
+{
+	if (!strcmp(a->attr.name, "may_compress"))
+		return sprintf(buf, "%d", may_compress ? 1 : 0);
+	else if (!strcmp(a->attr.name, "may_set_compr_fl"))
+		return sprintf(buf, "%d", may_set_compr_fl ? 1 : 0);
+	return -EINVAL;
+}
+
+static ssize_t f2fs_may_compr_store(struct f2fs_attr *a,
+			struct f2fs_sb_info *sbi, const char *buf, size_t count)
+{
+	int val, ret;
+
+	ret = kstrtoint(buf, 0, &val);
+	if (ret < 0)
+		return ret;
+	if (!strcmp(a->attr.name, "may_compress"))
+		may_compress = val == 0 ? false : true;
+	else if (!strcmp(a->attr.name, "may_set_compr_fl"))
+		may_set_compr_fl = val == 0 ? false : true;
+	return count;
+}
+
 #define F2FS_FEATURE_RO_ATTR(_name)				\
 static struct f2fs_attr f2fs_attr_##_name = {			\
 	.attr = {.name = __stringify(_name), .mode = 0444 },	\
 	.show	= f2fs_feature_show,				\
+}
+
+#define F2FS_FEATURE_RW_ATTR(_name)				\
+static struct f2fs_attr f2fs_attr_##_name = {			\
+	.attr = {.name = __stringify(_name), .mode = 0644 },	\
+	.show	= f2fs_may_compr_show,				\
+	.store	= f2fs_may_compr_store,				\
 }
 
 static ssize_t f2fs_sb_feature_show(struct f2fs_attr *a,
@@ -1145,6 +1192,8 @@ F2FS_FEATURE_RO_ATTR(pin_file);
 #ifdef CONFIG_F2FS_FS_DEDUP
 F2FS_FEATURE_RO_ATTR(dedup);
 #endif
+F2FS_FEATURE_RW_ATTR(may_compress);
+F2FS_FEATURE_RW_ATTR(may_set_compr_fl);
 
 /* For ATGC */
 F2FS_RW_ATTR(ATGC_INFO, atgc_management, atgc_candidate_ratio, candidate_ratio);
@@ -1320,6 +1369,8 @@ static struct attribute *f2fs_feat_attrs[] = {
 #ifdef CONFIG_F2FS_FS_DEDUP
 	ATTR_LIST(dedup),
 #endif
+	ATTR_LIST(may_compress),
+	ATTR_LIST(may_set_compr_fl),
 	NULL,
 };
 ATTRIBUTE_GROUPS(f2fs_feat);

@@ -577,9 +577,6 @@ void check_for_migration(struct task_struct *p)
 
 void hook_scheduler_tick(void *data, struct rq *rq)
 {
-#if IS_ENABLED(CONFIG_OPLUS_FEATURE_ABNORMAL_FLAG)
-	int ret;
-#endif /* #OPLUS_FEATURE_ABNORMAL_FLAG */
 #if IS_ENABLED(CONFIG_OPLUS_FEATURE_GKI_CPUFREQ_BOUNCING)
 	int this_cpu = cpu_of(rq);
 	struct cpufreq_policy *pol = cpufreq_cpu_get_raw(this_cpu);
@@ -588,9 +585,7 @@ void hook_scheduler_tick(void *data, struct rq *rq)
 		cb_update(pol, ktime_get_ns());
 #endif
 #if IS_ENABLED(CONFIG_OPLUS_FEATURE_ABNORMAL_FLAG)
-	ret = get_ux_state_type(rq->curr);
-	if (ret != UX_STATE_INHERIT && ret != UX_STATE_SCHED_ASSIST)
-		test_task_overload(rq->curr);
+	test_task_overload(rq->curr);
 #endif /* #OPLUS_FEATURE_ABNORMAL_FLAG */
 
 #if IS_ENABLED(CONFIG_OPLUS_FEATURE_LOADBALANCE)

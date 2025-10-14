@@ -141,6 +141,12 @@ static int set_reg(struct adaptor_ctx *ctx, void *data, int val)
 		dev_err(ctx->dev, "In %s no regulator\n", __func__);
 		return -EFAULT;
 	}
+
+	if(val == 0) {
+		ret = regulator_disable(reg);
+		pr_err("%s  regulator_disable ret:%d", __func__, ret);
+		return ret;
+	}
 #endif
 	ret = regulator_set_voltage(reg, val, val);
 	if (ret) {
@@ -548,15 +554,29 @@ int do_hw_power_off(struct adaptor_ctx *ctx)
 	if (ctx->subdrv->ops->power_off)
 		subdrv_call(ctx, power_off, NULL);
 
-	for (i = ctx->subdrv->pw_seq_cnt - 1; i >= 0; i--) {
-		ent = &ctx->subdrv->pw_seq[i];
-		op = &ctx->hw_ops[ent->id];
-		if (!op->unset)
-			continue;
-		op->unset(ctx, op->data, ent->val);
-		//msleep(ent->delay);
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+	if(ctx->subdrv->pw_off_seq != NULL) {
+		for (i = ctx->subdrv->pw_off_seq_cnt - 1; i >= 0; i--) {
+			ent = &ctx->subdrv->pw_off_seq[i];
+			op = &ctx->hw_ops[ent->id];
+			if (!op->unset)
+				continue;
+			op->unset(ctx, op->data, ent->val);
+			//msleep(ent->delay);
+		}
+	} else {
+#endif
+		for (i = ctx->subdrv->pw_seq_cnt - 1; i >= 0; i--) {
+			ent = &ctx->subdrv->pw_seq[i];
+			op = &ctx->hw_ops[ent->id];
+			if (!op->unset)
+				continue;
+			op->unset(ctx, op->data, ent->val);
+			//msleep(ent->delay);
+		}
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
 	}
-
+#endif
 	op = &ctx->hw_ops[HW_ID_MIPI_SWITCH];
 	if (op->unset)
 		op->unset(ctx, op->data, 0);

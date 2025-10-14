@@ -4610,8 +4610,14 @@ static unsigned int get_master_raw_id(unsigned int num_raw_drivers,
 			break;
 	}
 
+#ifndef OPLUS_FEATURE_CAMERA_COMMON
 	if (i == num_raw_drivers)
 		pr_info("no master raw id found, enabled_raw 0x%x", enabled_raw);
+#else /* OPLUS_FEATURE_CAMERA_COMMON */
+	if (i == num_raw_drivers) {
+		pr_info("no master raw id found, enabled_raw 0x%x, num_raw_drivers(%u)", enabled_raw, num_raw_drivers);
+	}
+#endif /* OPLUS_FEATURE_CAMERA_COMMON */
 
 	return i;
 }
@@ -4619,7 +4625,17 @@ struct mtk_raw_device *get_master_raw_dev(struct mtk_cam_device *cam,
 					  struct mtk_raw_pipeline *pipe)
 {
 	unsigned int i = get_master_raw_id(cam->num_raw_drivers, pipe->enabled_raw);
+#ifndef OPLUS_FEATURE_CAMERA_COMMON
 	struct device *dev_master = cam->raw.devs[i];
+#else /* OPLUS_FEATURE_CAMERA_COMMON */
+	struct device *dev_master;
+	if (i >= RAW_PIPELINE_NUM) {
+		dev_info(cam->dev, "%s: Raw pipelineId(%u) out of bounds(%u)\n", __func__, i, RAW_PIPELINE_NUM);
+		return NULL;
+	}
+	dev_master = cam->raw.devs[i];
+#endif /* OPLUS_FEATURE_CAMERA_COMMON */
+
 
 	if (!dev_master) {
 		dev_info(cam->dev, "%s: dev_master is null\n", __func__);
@@ -8373,6 +8389,15 @@ static void mtk_cam_ctx_watchdog_worker(struct work_struct *work)
 	}
 
 	raw = get_master_raw_dev(ctx->cam, ctx->pipe);
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+	if (!raw) {
+		dev_info(ctx->cam->dev,
+			"%s:ctx(%d):stop watchdog task for no raw ctx\n",
+			__func__, ctx->stream_id);
+		complete(&watchdog_data->watchdog_complete);
+		return;
+	}
+#endif /* OPLUS_FEATURE_CAMERA_COMMON */
 	timeout = mtk_cam_seninf_check_timeout(seninf,
 					       watchdog_data->watchdog_time_diff_ns);
 	if (last_vsync_count == raw->vsync_count)
@@ -8934,6 +8959,13 @@ void mtk_ctx_watchdog_stop(struct mtk_cam_ctx *ctx, int pipe_id, int ctx_streamo
 	dev_info(ctx->cam->dev, "%s:ctx/pipe_id(%d/%d):stop the watchdog\n",
 			__func__, ctx->stream_id, pipe_id);
 
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+	spin_lock_irqsave(&ctx->watchdog_pipe_lock, flags);
+	ctx->enabled_watchdog_pipe &= ~(1 << pipe_id);
+	spin_unlock_irqrestore(&ctx->watchdog_pipe_lock, flags);
+	cancel_work_sync(&ctx->watchdog_data[pipe_id].watchdog_work);
+#endif /* OPLUS_FEATURE_CAMERA_COMMON */
+
 	/* Prevent from ctx stopping in the middle of last watchdog worker */
 #ifdef OPLUS_FEATURE_CAMERA_COMMON
 	if (ctx_streamoff)
@@ -8950,7 +8982,9 @@ void mtk_ctx_watchdog_stop(struct mtk_cam_ctx *ctx, int pipe_id, int ctx_streamo
 			__func__, ctx->stream_id, pipe_id);
 
 	spin_lock_irqsave(&ctx->watchdog_pipe_lock, flags);
+#ifndef OPLUS_FEATURE_CAMERA_COMMON
 	ctx->enabled_watchdog_pipe &= ~(1 << pipe_id);
+#endif /* OPLUS_FEATURE_CAMERA_COMMON */
 	watchdog_data->ctx = NULL;
 	/* Stop timer when the last raw watchdog stop */
 	if (is_raw_subdev(pipe_id) && !(ctx->enabled_watchdog_pipe & raw_pipe_mask))

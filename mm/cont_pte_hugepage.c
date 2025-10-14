@@ -3089,8 +3089,8 @@ static int __init cmdline_parse_prjname(char *p)
 {
 	static const char *cn_prjs[] = {
 		"22047", "23021",
-		"22017", "21121",
-		"22921", "22021",
+		"22017", "21121", "21861",
+		"22921", "22021", "21007", "22823",
 		NULL,
 	};
 	static const char *other_prjs[] = {

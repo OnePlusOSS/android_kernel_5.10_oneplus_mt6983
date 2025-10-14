@@ -237,6 +237,25 @@
 			support_ui_dev_ori = <1>;
 			use_sub_accgyro = <1>;
 		};
+		free_fall: free_fall{
+			status = "okay";
+			static_judge_length = <400>;
+			static_judge_acc_thresh = <1>;
+			freefall_judge_length = <80>;
+			freefall_judge_acc_thresh = <20>;
+			move_judge_length = <60>;
+			move_judge_acc_thresh = <1>;
+			freefall_start_judge_length  = <50>;
+			freefall_start_acc_thresh = <70>;
+			freefall_throw_judge_length = <700>;
+			freefall_throw_acc_thresh = <50>;
+			freefall_end_acc_thresh = <30>;
+			freefall_valid_time_length = <1000>;
+			freefall_peek_time_length = <200>;
+			freefall_peek_acc_thresh = <98>;
+			freefall_material_thresh = <900>;
+			valid_peek_interval_thresh = <10000>;
+		};
 	};
 /* sensor end */
 };

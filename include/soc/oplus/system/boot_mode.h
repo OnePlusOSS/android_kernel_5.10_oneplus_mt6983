@@ -9,8 +9,8 @@
 **     change define of boot_mode here for other place to use it
 ** Version: 1.0 
 ************************************************************************************/
-#ifndef _OPPO_BOOT_H
-#define _OPPO_BOOT_H
+#ifndef _OPLUS_BOOT_H
+#define _OPLUS_BOOT_H
 enum{
         MSM_BOOT_MODE__NORMAL,
         MSM_BOOT_MODE__FASTBOOT,
@@ -35,7 +35,7 @@ extern bool qpnp_is_power_off_charging(void);
 /*add for detect charger when reboot */
 extern bool qpnp_is_charger_reboot(void);
 #endif /*OPLUS_BUG_STABILITY*/
-#endif  /*_OPPO_BOOT_H*/
+#endif  /*_OPLUS_BOOT_H*/
 
 #ifdef OPLUS_BUG_STABILITY
 /*Add for kernel monitor whole bootup*/

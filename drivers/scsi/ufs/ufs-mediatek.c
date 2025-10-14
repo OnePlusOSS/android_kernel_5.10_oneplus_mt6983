@@ -874,11 +874,6 @@ static void ufs_mtk_trace_vh_compl_command_vend_ss(struct ufs_hba *hba,
 			}
 		}
 	}
-#if defined(CONFIG_UFSHID)
-	/* Check if it is the last request to be completed */
-	if (!out_tasks && (out_reqs == (1 << lrbp->task_tag)))
-		schedule_work(&ufsf->on_idle_work);
-#endif
 
 /*feature-devinfo-v001-3-begin*/
 	if (lrbp->cmd) {
@@ -895,16 +890,6 @@ static void ufs_mtk_trace_vh_compl_command_vend_ss(struct ufs_hba *hba,
 /*feature-devinfo-v001-3-end*/
 }
 
-static void ufs_mtk_trace_vh_send_tm_command_vend_ss(void *data, struct ufs_hba *hba,
-			int tag, const char *str)
-{
-	struct ufsf_feature *ufsf = ufs_mtk_get_ufsf(hba);
-
-	if (strcmp(str, "tm_complete") == 0)
-		ufsf_reset_lu(ufsf);
-
-}
-
 static void ufs_mtk_trace_vh_update_sdev_vend_ss(void *data, struct scsi_device *sdev)
 {
 	struct ufs_hba *hba = shost_priv(sdev->host);
@@ -912,14 +897,6 @@ static void ufs_mtk_trace_vh_update_sdev_vend_ss(void *data, struct scsi_device 
 
 	if (hba->dev_info.wmanufacturerid == UFS_VENDOR_SAMSUNG)
 		ufsf_slave_configure(ufsf, sdev);
-}
-
-static void ufs_mtk_trace_vh_send_command_vend_ss(void *data, struct ufs_hba *hba,
-				struct ufshcd_lrb *lrbp)
-{
-	struct ufsf_feature *ufsf = ufs_mtk_get_ufsf(hba);
-
-	ufsf_hid_acc_io_stat(ufsf, lrbp);
 }
 #endif
 
@@ -996,18 +973,8 @@ static struct tracepoints_table interests[] = {
 		.vend = UFS_VEND_SAMSUNG
 	},
 	{
-		.name = "android_vh_ufs_send_tm_command",
-		.func = ufs_mtk_trace_vh_send_tm_command_vend_ss,
-		.vend = UFS_VEND_SAMSUNG
-	},
-	{
 		.name = "android_vh_ufs_update_sdev",
 		.func = ufs_mtk_trace_vh_update_sdev_vend_ss,
-		.vend = UFS_VEND_SAMSUNG
-	},
-	{
-		.name = "android_vh_ufs_send_command",
-		.func = ufs_mtk_trace_vh_send_command_vend_ss,
 		.vend = UFS_VEND_SAMSUNG
 	},
 #endif
@@ -1887,31 +1854,6 @@ static void ufs_mtk_ctrl_dev_pwr(struct ufs_hba *hba, bool vcc_on, bool is_init)
 }
 /*feature-flashaging806-v001-2-begin*/
 //#ifdef OPLUS_UFS_SIGNAL_QUALITY
-static void recordTimeStamp(
-	struct signal_quality *record,
-	enum ufs_event_type type
-) {
-	ktime_t cur_time = ktime_get();
-	switch (type)
-	{
-	case UFS_EVT_PA_ERR:
-	case UFS_EVT_DL_ERR:
-	case UFS_EVT_NL_ERR:
-	case UFS_EVT_TL_ERR:
-	case UFS_EVT_DME_ERR:
-		if (STAMP_RECORD_MAX <= record->stamp_pos)
-			return;
-		if (0 == record->stamp_pos)
-			record->stamp[0] = cur_time;
-		else if (cur_time > (record->stamp[record->stamp_pos - 1] +
-				STAMP_MIN_INTERVAL))
-			record->stamp[record->stamp_pos++] = cur_time;
-		return;
-	default:
-		return;
-	}
-}
-
 void recordUniproErr(
 	struct unipro_signal_quality_ctrl *signalCtrl,
 	u32 reg,
@@ -1920,7 +1862,6 @@ void recordUniproErr(
 	unsigned long err_bits;
 	int ec;
 	struct signal_quality *rec = &signalCtrl->record;
-	recordTimeStamp(rec, type);
 	switch (type)
 	{
 	case UFS_EVT_FATAL_ERR:
@@ -1988,8 +1929,8 @@ void recordUniproErr(
 	seq_printf(s, #x"\t%d\n", signalCtrl->record.unipro_TL_err_cnt[x])
 #define SEQ_DME_PRINT(x)    \
 	seq_printf(s, #x"\t%d\n", signalCtrl->record.unipro_DME_err_cnt[x])
-#define SEQ_STAMP_PRINT(x)  \
-	seq_printf(s, #x"\t%d\n", signalCtrl->record.stamp[x])
+#define SEQ_GEAR_PRINT(x)  \
+	seq_printf(s, #x"\t%d\n", signalCtrl->record.gear_err_cnt[x])
 
 static int record_read_func(struct seq_file *s, void *v)
 {
@@ -2042,6 +1983,10 @@ static int record_read_func(struct seq_file *s, void *v)
 	SEQ_DME_PRINT(UNIPRO_DME_TX_QOS);
 	SEQ_DME_PRINT(UNIPRO_DME_RX_QOS);
 	SEQ_DME_PRINT(UNIPRO_DME_PA_INIT_QOS);
+	SEQ_GEAR_PRINT(UFS_HS_G1);
+	SEQ_GEAR_PRINT(UFS_HS_G2);
+	SEQ_GEAR_PRINT(UFS_HS_G3);
+	SEQ_GEAR_PRINT(UFS_HS_G4);
 	return 0;
 }
 
@@ -2060,10 +2005,43 @@ static const struct proc_ops record_fops = {
 	seq_printf(s, #x": %d\n", signalCtrl->record.x \
 		-signalCtrl->record_upload.x);\
 	signalCtrl->record_upload.x = signalCtrl->record.x;
-#define SEQ_UPLOAD_STAMP_PRINT(x) \
-	seq_printf(s, #x": %d\n", signalCtrl->record.stamp[x] \
-		-signalCtrl->record_upload.stamp[x]);\
-	signalCtrl->record_upload.stamp[x] = signalCtrl->record.stamp[x];
+
+#define SEQ_PA_UPLOAD_PRINT(x) \
+	seq_printf(s, #x": %d\n", signalCtrl->record.unipro_PA_err_cnt[x] \
+		-signalCtrl->record_upload.unipro_PA_err_cnt[x]);\
+	signalCtrl->record_upload.unipro_PA_err_cnt[x] = signalCtrl->record.unipro_PA_err_cnt[x];
+
+#define SEQ_DL_UPLOAD_PRINT(x) \
+		seq_printf(s, #x": %d\n", signalCtrl->record.unipro_DL_err_cnt[x] \
+			-signalCtrl->record_upload.unipro_DL_err_cnt[x]);\
+		signalCtrl->record_upload.unipro_DL_err_cnt[x] = signalCtrl->record.unipro_DL_err_cnt[x];
+
+#define SEQ_DL_UPLOAD_PRINT(x) \
+			seq_printf(s, #x": %d\n", signalCtrl->record.unipro_DL_err_cnt[x] \
+				-signalCtrl->record_upload.unipro_DL_err_cnt[x]);\
+			signalCtrl->record_upload.unipro_DL_err_cnt[x] = signalCtrl->record.unipro_DL_err_cnt[x];
+
+#define SEQ_NL_UPLOAD_PRINT(x) \
+				seq_printf(s, #x": %d\n", signalCtrl->record.unipro_NL_err_cnt[x] \
+					-signalCtrl->record_upload.unipro_NL_err_cnt[x]);\
+				signalCtrl->record_upload.unipro_NL_err_cnt[x] = signalCtrl->record.unipro_NL_err_cnt[x];
+
+#define SEQ_TL_UPLOAD_PRINT(x) \
+					seq_printf(s, #x": %d\n", signalCtrl->record.unipro_TL_err_cnt[x] \
+						-signalCtrl->record_upload.unipro_TL_err_cnt[x]);\
+					signalCtrl->record_upload.unipro_TL_err_cnt[x] = signalCtrl->record.unipro_TL_err_cnt[x];
+
+#define SEQ_DME_UPLOAD_PRINT(x) \
+						seq_printf(s, #x": %d\n", signalCtrl->record.unipro_DME_err_cnt[x] \
+							-signalCtrl->record_upload.unipro_DME_err_cnt[x]);\
+						signalCtrl->record_upload.unipro_DME_err_cnt[x] = signalCtrl->record.unipro_DME_err_cnt[x];
+
+#define SEQ_GEAR_UPLOAD_PRINT(x) \
+						seq_printf(s, #x": %d\n", signalCtrl->record.gear_err_cnt[x] \
+							-signalCtrl->record_upload.gear_err_cnt[x]);\
+						signalCtrl->record_upload.gear_err_cnt[x] = signalCtrl->record.gear_err_cnt[x];
+
+
 static int record_upload_read_func(struct seq_file *s, void *v)
 {
 	struct unipro_signal_quality_ctrl *signalCtrl =
@@ -2080,6 +2058,50 @@ static int record_upload_read_func(struct seq_file *s, void *v)
 	SEQ_UPLOAD_PRINT(unipro_NL_err_total_cnt);
 	SEQ_UPLOAD_PRINT(unipro_TL_err_total_cnt);
 	SEQ_UPLOAD_PRINT(unipro_DME_err_total_cnt);
+	SEQ_PA_UPLOAD_PRINT(UNIPRO_PA_LANE0_ERR_CNT);
+	SEQ_PA_UPLOAD_PRINT(UNIPRO_PA_LANE1_ERR_CNT);
+	SEQ_PA_UPLOAD_PRINT(UNIPRO_PA_LANE2_ERR_CNT);
+	SEQ_PA_UPLOAD_PRINT(UNIPRO_PA_LANE3_ERR_CNT);
+	SEQ_PA_UPLOAD_PRINT(UNIPRO_PA_LINE_RESET);
+
+	SEQ_DL_UPLOAD_PRINT(UNIPRO_DL_NAC_RECEIVED);
+	SEQ_DL_UPLOAD_PRINT(UNIPRO_DL_TCX_REPLAY_TIMER_EXPIRED);
+	SEQ_DL_UPLOAD_PRINT(UNIPRO_DL_AFCX_REQUEST_TIMER_EXPIRED);
+	SEQ_DL_UPLOAD_PRINT(UNIPRO_DL_FCX_PROTECTION_TIMER_EXPIRED);
+	SEQ_DL_UPLOAD_PRINT(UNIPRO_DL_CRC_ERROR);
+	SEQ_DL_UPLOAD_PRINT(UNIPRO_DL_RX_BUFFER_OVERFLOW);
+	SEQ_DL_UPLOAD_PRINT(UNIPRO_DL_MAX_FRAME_LENGTH_EXCEEDED);
+	SEQ_DL_UPLOAD_PRINT(UNIPRO_DL_WRONG_SEQUENCE_NUMBER);
+	SEQ_DL_UPLOAD_PRINT(UNIPRO_DL_AFC_FRAME_SYNTAX_ERROR);
+	SEQ_DL_UPLOAD_PRINT(UNIPRO_DL_NAC_FRAME_SYNTAX_ERROR);
+	SEQ_DL_UPLOAD_PRINT(UNIPRO_DL_EOF_SYNTAX_ERROR);
+	SEQ_DL_UPLOAD_PRINT(UNIPRO_DL_FRAME_SYNTAX_ERROR);
+	SEQ_DL_UPLOAD_PRINT(UNIPRO_DL_BAD_CTRL_SYMBOL_TYPE);
+	SEQ_DL_UPLOAD_PRINT(UNIPRO_DL_PA_INIT_ERROR);
+	SEQ_DL_UPLOAD_PRINT(UNIPRO_DL_PA_ERROR_IND_RECEIVED);
+	SEQ_DL_UPLOAD_PRINT(UNIPRO_DL_PA_INIT);
+
+	SEQ_NL_UPLOAD_PRINT(UNIPRO_NL_UNSUPPORTED_HEADER_TYPE);
+	SEQ_NL_UPLOAD_PRINT(UNIPRO_NL_BAD_DEVICEID_ENC);
+	SEQ_NL_UPLOAD_PRINT(UNIPRO_NL_LHDR_TRAP_PACKET_DROPPING);
+
+	SEQ_TL_UPLOAD_PRINT(UNIPRO_TL_UNSUPPORTED_HEADER_TYPE);
+	SEQ_TL_UPLOAD_PRINT(UNIPRO_TL_UNKNOWN_CPORTID);
+	SEQ_TL_UPLOAD_PRINT(UNIPRO_TL_NO_CONNECTION_RX);
+	SEQ_TL_UPLOAD_PRINT(UNIPRO_TL_CONTROLLED_SEGMENT_DROPPING);
+	SEQ_TL_UPLOAD_PRINT(UNIPRO_TL_BAD_TC);
+	SEQ_TL_UPLOAD_PRINT(UNIPRO_TL_E2E_CREDIT_OVERFLOW);
+	SEQ_TL_UPLOAD_PRINT(UNIPRO_TL_SAFETY_VALVE_DROPPING);
+
+	SEQ_DME_UPLOAD_PRINT(UNIPRO_DME_GENERIC);
+	SEQ_DME_UPLOAD_PRINT(UNIPRO_DME_TX_QOS);
+	SEQ_DME_UPLOAD_PRINT(UNIPRO_DME_RX_QOS);
+	SEQ_DME_UPLOAD_PRINT(UNIPRO_DME_PA_INIT_QOS);
+
+	SEQ_GEAR_UPLOAD_PRINT(UFS_HS_G1);
+	SEQ_GEAR_UPLOAD_PRINT(UFS_HS_G2);
+	SEQ_GEAR_UPLOAD_PRINT(UFS_HS_G3);
+	SEQ_GEAR_UPLOAD_PRINT(UFS_HS_G4);
 	return 0;
 }
 
@@ -2771,12 +2793,24 @@ static void ufs_mtk_fixup_dev_quirks(struct ufs_hba *hba)
 #endif
 }
 
+void recordGearErr(struct unipro_signal_quality_ctrl *signalCtrl, struct ufs_hba *hba)
+{
+	struct ufs_pa_layer_attr *pwr_info = &hba->pwr_info;
+	u32 dev_gear = min_t(u32, pwr_info->gear_rx, pwr_info->gear_tx);
+
+	if (dev_gear > UFS_HS_G4)
+		return;
+
+	signalCtrl->record.gear_err_cnt[dev_gear]++;
+}
+
 static void ufs_mtk_event_notify(struct ufs_hba *hba,
 				 enum ufs_event_type evt, void *data)
 {
 	unsigned int val = *(u32 *)data;
         /*feature-flashaging806-v001-4-begin*/
 	recordUniproErr(&signalCtrl, val, evt);
+	recordGearErr(&signalCtrl, hba);
         /*feature-flashaging806-v001-4-end*/
 	trace_ufs_mtk_event(evt, val);
 
@@ -2831,16 +2865,6 @@ static void ufs_mtk_hibern8_notify(struct ufs_hba *hba, enum uic_cmd_dme cmd,
 		usleep_range(5000, 5100);
 }
 
-void ufs_mtk_setup_task_mgmt(struct ufs_hba *hba, int tag, u8 tm_function)
-{
-#if defined(CONFIG_UFSFEATURE)
-	struct ufsf_feature *ufsf = ufs_mtk_get_ufsf(hba);
-
-	if (ufsf->hba && (tm_function == UFS_LOGICAL_RESET))
-		ufsf_prepare_reset_lu(ufsf);
-#endif
-}
-
 /*
  * struct ufs_hba_mtk_vops - UFS MTK specific variant operations
  *
@@ -2864,7 +2888,6 @@ static const struct ufs_hba_variant_ops ufs_hba_mtk_vops = {
 	.dbg_register_dump   = ufs_mtk_dbg_register_dump,
 	.device_reset        = ufs_mtk_device_reset,
 	.event_notify        = ufs_mtk_event_notify,
-	.setup_task_mgmt     = ufs_mtk_setup_task_mgmt,
 };
 
 /**
@@ -2980,7 +3003,7 @@ int ufs_mtk_pltfrm_suspend(struct device *dev)
 
 #if defined(CONFIG_UFSFEATURE)
 	if (ufsf->hba)
-		ufsf_suspend(ufsf);
+		ufsf_suspend(ufsf, true);
 #endif
 
 	/* Check if shutting down */
@@ -3049,7 +3072,7 @@ int ufs_mtk_pltfrm_runtime_suspend(struct device *dev)
 	struct ufsf_feature *ufsf = ufs_mtk_get_ufsf(hba);
 
 	if (ufsf->hba)
-		ufsf_suspend(ufsf);
+		ufsf_suspend(ufsf, false);
 #endif
 
 	if (ufshcd_is_auto_hibern8_supported(hba)) {
@@ -3106,7 +3129,7 @@ void ufs_mtk_shutdown(struct platform_device *pdev)
 	struct ufsf_feature *ufsf = ufs_mtk_get_ufsf(hba);
 
 	if (ufsf->hba)
-		ufsf_suspend(ufsf);
+		ufsf_suspend(ufsf, false);
 #endif
 
 	/*

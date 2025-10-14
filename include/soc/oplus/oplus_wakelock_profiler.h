@@ -14,8 +14,8 @@
  */
 
 
-#ifndef __OPPO_WAKELOCK_PROFILER_H__
-#define __OPPO_WAKELOCK_PROFILER_H__
+#ifndef __OPLUS_WAKELOCK_PROFILER_H__
+#define __OPLUS_WAKELOCK_PROFILER_H__
 
 
 #include <linux/kobject.h>
@@ -44,7 +44,7 @@
 
 #define WS_CNT_ALL WS_CNT_MASK
 
-#ifdef CONFIG_OPPO_POWER_MTK
+#ifdef CONFIG_OPLUS_POWER_MTK
 #define IRQ_NAME_SENSOR_SCP "SCP"
 #define IRQ_NAME_SENSOR_MBOX "MBOX"
 #define IRQ_NAME_WLAN_IPCC_DATA "wlan"
@@ -100,7 +100,7 @@
 /* not wakeup source irq name, just used for statics*/
 #define IRQ_PROP_DUMMY_STATICS (1<<2)
 
-#ifdef CONFIG_OPPO_WAKELOCK_PROFILER
+#ifdef CONFIG_OPLUS_WAKELOCK_PROFILER
 
 int wakeup_reasons_statics(const char *irq_name, int choose_flag);
 void wakeup_reasons_clear(int choose_flag);

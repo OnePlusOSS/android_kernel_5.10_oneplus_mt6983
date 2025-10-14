@@ -228,7 +228,7 @@ int FP5513E4AF_Release(struct inode *a_pstInode, struct file *a_pstFile)
 			if (currPosition > 260)
 				currPosition -= 50;
 			else
-				currPosition -= 10;
+				currPosition -= 20;
 			s4AF_WriteReg((unsigned short)currPosition);
 			LOG_INF("currPosition=%d ",currPosition);
 			mdelay(7);
@@ -256,6 +256,20 @@ int FP5513E4AF_SetI2Cclient(struct i2c_client *pstAF_I2Cclient,
 	g_pAF_Opened = pAF_Opened;
 
 	initAF();
+
+	if (*g_pAF_Opened == 2) {
+		if (g_u4CurrPosition > 640) {
+			unsigned short backpos = 320;
+			while (g_u4CurrPosition - backpos >= 80) {
+				backpos += 80;
+				if (s4AF_WriteReg(backpos) != 0) {
+					LOG_INF("AF FP5513E4AF_Release I2C failed");
+					break;
+				}
+				LOG_INF("backing to lastpos p:%d", backpos);
+			}
+		}
+	}
 
 	return 1;
 }

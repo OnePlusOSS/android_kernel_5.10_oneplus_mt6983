@@ -487,6 +487,7 @@ struct mtk_panel_params {
 	unsigned int panel_type;
 	/* #endif */ /* OPLUS_BUG_STABILITY */
 	bool esd_check_multi;
+	bool move_esd_readdate_back;
 	bool oplus_esd_val_compare_skip;
 	unsigned int set_area_before_trigger;
 	bool oplus_need_wait_ms_time;
@@ -610,6 +611,7 @@ struct mtk_panel_funcs {
 	int (*send_cmd_before_dsi_read)(struct drm_panel *panel, void *dsi_drv,
                 dcs_write_gce cb, void *handle);
 	int (*sn_set)(struct drm_panel *panel);
+	void (*oplus_get_info)(struct drm_panel *panel, int read_ic);
 	//#endif
 	int (*ext_cmd_set)(void *dsi, dcs_write_gce cb, void *handle);
 	/**

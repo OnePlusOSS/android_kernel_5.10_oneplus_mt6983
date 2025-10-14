@@ -10,7 +10,6 @@
 #include <linux/pm_runtime.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
-
 #include "../common/mtk-afe-platform-driver.h"
 #include "mt6789-afe-common.h"
 #include "mt6789-afe-clk.h"
@@ -36,7 +35,14 @@
 #endif
 #endif
 
+#if IS_ENABLED(CONFIG_SND_SMARTPA_FS18XX)
+#ifndef OPLUS_ARCH_EXTENDS
+#define OPLUS_ARCH_EXTENDS
+#endif
+#endif
+
 #ifdef OPLUS_ARCH_EXTENDS
+void extend_set_smartpa_type(int smartpa_type);
 extern void extend_codec_i2s_be_dailinks(struct snd_soc_dai_link *dailink, size_t size);
 #endif
 
@@ -1261,8 +1267,18 @@ static int mt6789_mt6366_dev_probe(struct platform_device *pdev)
 	}
 
 	/* get speaker codec node */
-	spk_node = of_get_child_by_name(pdev->dev.of_node,
-					"mediatek,speaker-codec");
+	if (mtk_spk_get_type() == MTK_SPK_AWINIC_AW883XX &&
+	    of_find_property(pdev->dev.of_node, "mediatek,speaker-codec-aw", NULL)) {
+		spk_node = of_get_child_by_name(pdev->dev.of_node, "mediatek,speaker-codec-aw");
+		pr_info("%s() use awinic", __func__);
+	} else if (mtk_spk_get_type() == MTK_SPK_FOURSEMI_FS18XX &&
+		   of_find_property(pdev->dev.of_node, "mediatek,speaker-codec-fs", NULL)) {
+		spk_node = of_get_child_by_name(pdev->dev.of_node, "mediatek,speaker-codec-fs");
+		pr_info("%s() use foursemi", __func__);
+	} else {
+		spk_node = of_get_child_by_name(pdev->dev.of_node, "mediatek,speaker-codec");
+		pr_info("%s() use deault", __func__);
+	}
 	if (!spk_node) {
 		dev_err(&pdev->dev,
 			"spk_node of_get_child_by_name fail\n");
@@ -1293,6 +1309,7 @@ static int mt6789_mt6366_dev_probe(struct platform_device *pdev)
 #endif
 	}
 #ifdef OPLUS_ARCH_EXTENDS
+	extend_set_smartpa_type(mtk_spk_get_type());
 	extend_codec_i2s_be_dailinks(mt6789_mt6366_dai_links, ARRAY_SIZE(mt6789_mt6366_dai_links));
 #endif
 

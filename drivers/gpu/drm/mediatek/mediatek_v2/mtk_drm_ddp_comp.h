@@ -500,6 +500,7 @@ enum mtk_ddp_io_cmd {
 	LCM_SEED,
 	PANEL_SN_SET,
 	DC_POST_ENTER,
+	OPLUS_GET_INFO,
 //#endif
 //#ifdef OPLUS_BUG_STABILITY
 	OPLUS_GET_MIPI_LPX,

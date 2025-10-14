@@ -1193,9 +1193,10 @@ static int parse_options(struct super_block *sb, char *options, bool is_remount)
 				break;
 			}
 			name = match_strdup(&args[0]);
-			if (!strcmp(name, "fixed-input")) {
+			/* fix coverity error: Dereference null return value name*/
+			if (name && !strcmp(name, "fixed-input")) {
 				F2FS_OPTION(sbi).compress_layout = COMPRESS_FIXED_INPUT;
-			} else if (!strcmp(name, "fixed-output")) {
+			} else if (name && !strcmp(name, "fixed-output")) {
 				if (F2FS_OPTION(sbi).compress_algorithm != COMPRESS_LZ4 ||
 				    F2FS_OPTION(sbi).compress_level != 0) {
 					f2fs_err(sbi, "fixed-output compress layout can only work on lz4");
@@ -1521,7 +1522,6 @@ static void destroy_device_list(struct f2fs_sb_info *sbi)
 		blkdev_put(FDEV(i).bdev, FMODE_EXCL);
 #ifdef CONFIG_BLK_DEV_ZONED
 		kvfree(FDEV(i).blkz_seq);
-		kfree(FDEV(i).zone_capacity_blocks);
 #endif
 	}
 	kvfree(sbi->devs);
@@ -1605,10 +1605,6 @@ static void f2fs_put_super(struct super_block *sb)
 	f2fs_destroy_node_manager(sbi);
 	f2fs_destroy_segment_manager(sbi);
 
-#ifdef CONFIG_F2FS_FS_COMPRESSION_FIXED_OUTPUT
-	if (sbi->delay_release_wq)
-		destroy_workqueue(sbi->delay_release_wq);
-#endif
 	f2fs_destroy_post_read_wq(sbi);
 
 	kvfree(sbi->ckpt);
@@ -2024,13 +2020,35 @@ static int f2fs_show_options(struct seq_file *seq, struct dentry *root)
 	return 0;
 }
 
-static void default_options(struct f2fs_sb_info *sbi)
+static bool is_data_partition(struct f2fs_sb_info *sbi)
+{
+	uint64_t min_data_partition_blocks = 0x800000; // 32GB
+
+	if (le64_to_cpu(sbi->raw_super->block_count) > min_data_partition_blocks)
+		return true;
+	return false;
+}
+
+static void default_options(struct f2fs_sb_info *sbi, bool remount)
 {
 #ifdef CONFIG_F2FS_FS_COMPRESSION_FIXED_OUTPUT
 	int i = 0;
 #endif
 
+	if (is_data_partition(sbi)) {
+		sbi->oplus_feats = OPLUS_FEAT_COMPR;
+		sbi->oplus_feats |= OPLUS_FEAT_DEDUP;
+	}
+
 	/* init some FS parameters */
+	if (!remount) {
+		set_opt(sbi, READ_EXTENT_CACHE);
+		clear_opt(sbi, DISABLE_CHECKPOINT);
+
+		if (f2fs_hw_support_discard(sbi) || f2fs_hw_should_discard(sbi))
+			set_opt(sbi, DISCARD);
+	}
+
 	if (f2fs_sb_has_readonly(sbi))
 		F2FS_OPTION(sbi).active_logs = NR_CURSEG_RO_TYPE;
 	else
@@ -2049,15 +2067,13 @@ static void default_options(struct f2fs_sb_info *sbi)
 	F2FS_OPTION(sbi).memory_mode = MEMORY_MODE_NORMAL;
 #ifdef CONFIG_F2FS_FS_COMPRESSION_FIXED_OUTPUT
 	F2FS_OPTION(sbi).compress_mode = COMPR_MODE_USER;
-	F2FS_OPTION(sbi).compress_layout = COMPRESS_FIXED_OUTPUT; // FIXME: for debug, the default is COMPR_FIXED_INPUT
-								  // need consider how to pass VTS if fixed-output is
-								  // the default value
+	F2FS_OPTION(sbi).compress_layout = COMPRESS_FIXED_OUTPUT;
 	strcpy(F2FS_OPTION(sbi).extensions[i++], "odex");
 	strcpy(F2FS_OPTION(sbi).extensions[i++], "vdex");
-	strcpy(F2FS_OPTION(sbi).extensions[i++], "so");
-	strcpy(F2FS_OPTION(sbi).extensions[i++], "dex");
-	strcpy(F2FS_OPTION(sbi).extensions[i++], "wxapkg");
-	strcpy(F2FS_OPTION(sbi).extensions[i++], "js");
+	//strcpy(F2FS_OPTION(sbi).extensions[i++], "so");
+	//strcpy(F2FS_OPTION(sbi).extensions[i++], "dex");
+	//strcpy(F2FS_OPTION(sbi).extensions[i++], "wxapkg");
+	//strcpy(F2FS_OPTION(sbi).extensions[i++], "js");
 	F2FS_OPTION(sbi).compress_ext_cnt = (unsigned char)i;
 #else
 	F2FS_OPTION(sbi).compress_mode = COMPR_MODE_FS;
@@ -2067,14 +2083,11 @@ static void default_options(struct f2fs_sb_info *sbi)
 	set_opt(sbi, INLINE_XATTR);
 	set_opt(sbi, INLINE_DATA);
 	set_opt(sbi, INLINE_DENTRY);
-	set_opt(sbi, READ_EXTENT_CACHE);
 	set_opt(sbi, NOHEAP);
-	clear_opt(sbi, DISABLE_CHECKPOINT);
 	set_opt(sbi, MERGE_CHECKPOINT);
 	F2FS_OPTION(sbi).unusable_cap = 0;
 	sbi->sb->s_flags |= SB_LAZYTIME;
 	set_opt(sbi, FLUSH_MERGE);
-	set_opt(sbi, DISCARD);
 	if (f2fs_sb_has_blkzoned(sbi))
 		F2FS_OPTION(sbi).fs_mode = FS_MODE_LFS;
 	else
@@ -2108,6 +2121,11 @@ static int f2fs_disable_checkpoint(struct f2fs_sb_info *sbi)
 	}
 	sbi->sb->s_flags |= SB_ACTIVE;
 
+	/* check if we need more GC first */
+	unusable = f2fs_get_unusable_blocks(sbi);
+	if (!f2fs_disable_cp_again(sbi, unusable))
+		goto skip_gc;
+
 	f2fs_update_time(sbi, DISABLE_TIME);
 
 	while (!f2fs_time_over(sbi, DISABLE_TIME)) {
@@ -2133,6 +2151,7 @@ static int f2fs_disable_checkpoint(struct f2fs_sb_info *sbi)
 		goto restore_flag;
 	}
 
+skip_gc:
 	f2fs_down_write(&sbi->gc_lock);
 	cpc.reason = CP_PAUSE;
 	set_sbi_flag(sbi, SBI_CP_DISABLED);
@@ -2232,7 +2251,7 @@ static int f2fs_remount(struct super_block *sb, int *flags, char *data)
 			clear_sbi_flag(sbi, SBI_NEED_SB_WRITE);
 	}
 
-	default_options(sbi);
+	default_options(sbi, true);
 
 	/* parse mount options */
 	err = parse_options(sb, data, true);
@@ -2442,7 +2461,6 @@ static ssize_t f2fs_quota_read(struct super_block *sb, int type, char *data,
 	size_t toread;
 	loff_t i_size = i_size_read(inode);
 	struct page *page;
-	char *kaddr;
 
 	if (off > i_size)
 		return 0;
@@ -2476,9 +2494,7 @@ repeat:
 			return -EIO;
 		}
 
-		kaddr = kmap_atomic(page);
-		memcpy(data, kaddr + offset, tocopy);
-		kunmap_atomic(kaddr);
+		memcpy_from_page(data, page, offset, tocopy);
 		f2fs_put_page(page, 1);
 
 		offset = 0;
@@ -2500,7 +2516,6 @@ static ssize_t f2fs_quota_write(struct super_block *sb, int type,
 	size_t towrite = len;
 	struct page *page;
 	void *fsdata = NULL;
-	char *kaddr;
 	int err = 0;
 	int tocopy;
 
@@ -2520,10 +2535,7 @@ retry:
 			break;
 		}
 
-		kaddr = kmap_atomic(page);
-		memcpy(kaddr + offset, data, tocopy);
-		kunmap_atomic(kaddr);
-		flush_dcache_page(page);
+		memcpy_to_page(page, offset, data, tocopy);
 
 		a_ops->write_end(NULL, mapping, off, tocopy, tocopy,
 						page, fsdata);
@@ -3626,24 +3638,29 @@ static int init_percpu_info(struct f2fs_sb_info *sbi)
 #ifdef CONFIG_BLK_DEV_ZONED
 
 struct f2fs_report_zones_args {
+	struct f2fs_sb_info *sbi;
 	struct f2fs_dev_info *dev;
-	bool zone_cap_mismatch;
 };
 
 static int f2fs_report_zone_cb(struct blk_zone *zone, unsigned int idx,
 			      void *data)
 {
 	struct f2fs_report_zones_args *rz_args = data;
+	block_t unusable_blocks = (zone->len - zone->capacity) >>
+					F2FS_LOG_SECTORS_PER_BLOCK;
 
 	if (zone->type == BLK_ZONE_TYPE_CONVENTIONAL)
 		return 0;
 
 	set_bit(idx, rz_args->dev->blkz_seq);
-	rz_args->dev->zone_capacity_blocks[idx] = zone->capacity >>
-						F2FS_LOG_SECTORS_PER_BLOCK;
-	if (zone->len != zone->capacity && !rz_args->zone_cap_mismatch)
-		rz_args->zone_cap_mismatch = true;
-
+	if (!rz_args->sbi->unusable_blocks_per_sec) {
+		rz_args->sbi->unusable_blocks_per_sec = unusable_blocks;
+		return 0;
+	}
+	if (rz_args->sbi->unusable_blocks_per_sec != unusable_blocks) {
+		f2fs_err(rz_args->sbi, "F2FS supports single zone capacity\n");
+		return -EINVAL;
+	}
 	return 0;
 }
 
@@ -3677,26 +3694,13 @@ static int init_blkz_info(struct f2fs_sb_info *sbi, int devi)
 	if (!FDEV(devi).blkz_seq)
 		return -ENOMEM;
 
-	/* Get block zones type and zone-capacity */
-	FDEV(devi).zone_capacity_blocks = f2fs_kzalloc(sbi,
-					FDEV(devi).nr_blkz * sizeof(block_t),
-					GFP_KERNEL);
-	if (!FDEV(devi).zone_capacity_blocks)
-		return -ENOMEM;
-
+	rep_zone_arg.sbi = sbi;
 	rep_zone_arg.dev = &FDEV(devi);
-	rep_zone_arg.zone_cap_mismatch = false;
 
 	ret = blkdev_report_zones(bdev, 0, BLK_ALL_ZONES, f2fs_report_zone_cb,
 				  &rep_zone_arg);
 	if (ret < 0)
 		return ret;
-
-	if (!rep_zone_arg.zone_cap_mismatch) {
-		kfree(FDEV(devi).zone_capacity_blocks);
-		FDEV(devi).zone_capacity_blocks = NULL;
-	}
-
 	return 0;
 }
 #endif
@@ -4018,7 +4022,7 @@ try_onemore:
 		sbi->s_chksum_seed = f2fs_chksum(sbi, ~0, raw_super->uuid,
 						sizeof(raw_super->uuid));
 
-	default_options(sbi);
+	default_options(sbi, false);
 	/* parse mount options */
 	options = kstrdup((const char *)data, GFP_KERNEL);
 	if (data && !options) {
@@ -4051,7 +4055,7 @@ try_onemore:
 	}
 #endif
 #ifdef CONFIG_F2FS_APPBOOST
-	sbi->appboost = 1;
+	sbi->appboost = 0;
 #define APPBOOST_MAX_BLOCKS 51200
 	sbi->appboost_max_blocks = APPBOOST_MAX_BLOCKS;
 #endif
@@ -4138,16 +4142,6 @@ try_onemore:
 	err = f2fs_init_page_array_cache(sbi);
 	if (err)
 		goto free_xattr_cache;
-
-#ifdef CONFIG_F2FS_FS_COMPRESSION_FIXED_OUTPUT
-	sbi->delay_release_wq = alloc_workqueue("f2fs_delay_release_wq",
-						WQ_UNBOUND | WQ_HIGHPRI,
-						num_online_cpus());
-	if (!sbi->delay_release_wq) {
-		err = -ENOMEM;
-		goto free_xattr_cache;
-	}
-#endif
 
 	/* get an inode for meta space */
 	sbi->meta_inode = f2fs_iget(sb, F2FS_META_INO(sbi));
@@ -4516,12 +4510,6 @@ static void kill_f2fs_super(struct super_block *sb)
 		f2fs_stop_discard_thread(sbi);
 
 #ifdef CONFIG_F2FS_FS_COMPRESSION
-#ifdef CONFIG_F2FS_FS_COMPRESSION_FIXED_OUTPUT
-		if (sbi->delay_release_wq) {
-			destroy_workqueue(sbi->delay_release_wq);
-			sbi->delay_release_wq = NULL;
-		}
-#endif
 		/*
 		 * latter evict_inode() can bypass checking and invalidating
 		 * compress inode cache.

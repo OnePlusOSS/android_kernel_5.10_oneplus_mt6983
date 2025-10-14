@@ -105,6 +105,19 @@ extern bool oplus_apollo_supported(void);
 extern unsigned int get_project(void);
 extern bool panel_is_aries(void);
 extern void oplus_printf_backlight_log(struct drm_crtc *crtc, unsigned int bl_lvl);
+#ifdef OPLUS_FEATURE_DISPLAY
+struct cmdq_instruction_disp {
+	u16 arg_c:16;
+	u16 arg_b:16;
+	u16 arg_a:16;
+	u8 s_op:5;
+	u8 arg_c_type:1;
+	u8 arg_b_type:1;
+	u8 arg_a_type:1;
+	u8 op:8;
+};
+extern void gpio_dump_regs_range(int start, int end);
+#endif
 /*#endif*/
 
 #include "../mml/mtk-mml.h"
@@ -1492,6 +1505,8 @@ mtk_drm_setbacklight(struct drm_crtc *crtc, unsigned int level, bool atomic)
 	// oplus apollo just set backlight 0 by mtk_drm_setbacklight, others backlight use api mtk_drm_setbacklight_without_lock
 	if (level == 0) {
 		mtk_crtc->oplus_power_on = false;
+	} else if (level > 0) {
+		mtk_crtc->oplus_power_on = true;
 	}
 #endif /* OPLUS_FEATURE_DISPLAY_APOLLO */
 
@@ -5214,6 +5229,12 @@ void mtk_crtc_cmdq_timeout_cb(struct cmdq_cb_data data)
 	u64 *inst;
 #endif
 
+#ifdef OPLUS_FEATURE_DISPLAY
+	struct cmdq_instruction_disp *cmdq_inst;
+	struct mtk_ddp_comp *comp;
+	int enable;
+	int prj_id = 0;
+#endif
 	if (!crtc) {
 		DDPPR_ERR("%s find crtc fail\n", __func__);
 		return;
@@ -5237,6 +5258,42 @@ void mtk_crtc_cmdq_timeout_cb(struct cmdq_cb_data data)
 		cmdq_thread_dump(cl->chan, mtk_crtc->trig_loop_cmdq_handle,
 				&inst, &trig_pc);
 		cmdq_dump_pkt(mtk_crtc->trig_loop_cmdq_handle, trig_pc, true);
+#ifdef OPLUS_FEATURE_DISPLAY
+		prj_id = get_project();
+		if (prj_id == 22017) {
+			gpio_dump_regs_range(119, 121);
+			gpio_dump_regs_range(21, 23);
+			gpio_dump_regs_range(19, 21);
+			gpio_dump_regs_range(40, 42);
+			if (inst) {
+				DDPINFO("%s get inst surcess\n", __func__);
+			} else {
+				DDPINFO("%s error get inst failed\n", __func__);
+				return;
+			}
+
+			cmdq_inst = (struct cmdq_instruction_disp *)inst;
+
+			if (cmdq_inst) {
+				DDPINFO("%s wait %u Event Timeout\n",__func__, cmdq_inst->arg_a);
+				if ((cmdq_inst->arg_a == 644) || (cmdq_inst->arg_a == 358)) {
+					DDPMSG("trigger TE event %d\n", cmdq_inst->arg_a);
+					comp = mtk_ddp_comp_request_output(mtk_crtc);
+					if (!comp || !comp->funcs || !comp->funcs->io_cmd) {
+						DDPINFO("cannot find output component\n");
+						return;
+					}
+					enable = 0;
+					if (cmdq_inst->arg_a == 358) {
+						if ((get_eng_version() == PREVERSION) || (get_eng_version() == AGING)) {
+						comp->funcs->io_cmd(comp, NULL, OPLUS_GET_INFO, &enable);
+						trig_db_enable = 1;
+						}
+					}
+				}
+			}
+		}
+#endif
 
 		DDPMSG("------ Dump trigger loop ------\n");
 		atomic_set(&disp_cmdq_timeout_flag, 0);
@@ -5252,7 +5309,42 @@ void mtk_crtc_cmdq_timeout_cb(struct cmdq_cb_data data)
 		cmdq_thread_dump(cl->chan, mtk_crtc->event_loop_cmdq_handle,
 				&inst, &trig_pc);
 		cmdq_dump_pkt(mtk_crtc->event_loop_cmdq_handle, trig_pc, true);
+#ifdef OPLUS_FEATURE_DISPLAY
+		prj_id = get_project();
+		if (prj_id == 22017) {
+			gpio_dump_regs_range(119, 121);
+			gpio_dump_regs_range(21, 23);
+			gpio_dump_regs_range(19, 21);
+			gpio_dump_regs_range(40, 42);
+			if (inst) {
+				DDPINFO("%s get inst surcess\n", __func__);
+			} else {
+				DDPINFO("%s error get inst failed\n", __func__);
+				return;
+			}
 
+			cmdq_inst = (struct cmdq_instruction_disp *)inst;
+
+			if (cmdq_inst) {
+				DDPINFO("%s wait %u Event Timeout\n",__func__, cmdq_inst->arg_a);
+				if ((cmdq_inst->arg_a == 705) || (cmdq_inst->arg_a == 358)) {
+					DDPMSG("trigger TE event %d\n", cmdq_inst->arg_a);
+					comp = mtk_ddp_comp_request_output(mtk_crtc);
+					if (!comp || !comp->funcs || !comp->funcs->io_cmd) {
+						DDPINFO("cannot find output component\n");
+						return;
+					}
+					enable = 0;
+					if (cmdq_inst->arg_a == 358) {
+						if ((get_eng_version() == PREVERSION) || (get_eng_version() == AGING)) {
+							comp->funcs->io_cmd(comp, NULL, OPLUS_GET_INFO, &enable);
+							trig_db_enable = 1;
+						}
+					}
+				}
+			}
+		}
+#endif
 		DDPMSG("------ Dump event loop ------\n");
 	}
 
@@ -5266,6 +5358,9 @@ void mtk_crtc_cmdq_timeout_cb(struct cmdq_cb_data data)
 	DDPAEE("%s cmdq timeout, crtc id:%d\n", __func__, drm_crtc_index(crtc));
 	if ((get_eng_version() == AGING) || trig_db_enable) {
 		oplus_kill_surfaceflinger();
+#ifdef OPLUS_FEATURE_DISPLAY
+		trig_db_enable = 0;
+#endif
 	}
 }
 //#endif

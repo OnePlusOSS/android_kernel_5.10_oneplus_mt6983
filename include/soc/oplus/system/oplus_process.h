@@ -6,8 +6,8 @@
 ** Version: 1.0
 ****************************************************************/
 
-#ifndef _OPPO_PROCESS_H
-#define _OPPO_PROCESS_H
+#ifndef _OPLUS_PROCESS_H
+#define _OPLUS_PROCESS_H
 
 static inline bool is_zygote_process(struct task_struct *t)
 {
@@ -80,4 +80,4 @@ static inline bool is_critial_process(struct task_struct *t) {
 		return false;
 	}
 }
-#endif /*_OPPO_PROCESS_H */
+#endif /*_OPLUS_PROCESS_H */

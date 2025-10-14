@@ -1425,17 +1425,34 @@ static void reset_reg(struct mtk_raw_device *dev)
 	writel(0, dev->base_inner + REG_CTL_SW_SUB_CTL);
 	writel(0, dev->base + REG_CTL_SW_SUB_CTL);
 
+	writel(0, dev->base + REG_CTL_RAW_INT_EN);
+	writel(0, dev->base + REG_CTL_RAW_INT2_EN);
+	writel(0, dev->base + REG_CTL_RAW_INT6_EN);
+	writel(0, dev->base + REG_CTL_RAW_INT7_EN);
+	writel(0, dev->base_inner + REG_CTL_RAW_INT_EN);
+	writel(0, dev->base_inner + REG_CTL_RAW_INT2_EN);
+	writel(0, dev->base_inner + REG_CTL_RAW_INT6_EN);
+	writel(0, dev->base_inner + REG_CTL_RAW_INT7_EN);
+
 	wmb(); /* make sure committed */
 
-	dev_dbg(dev->dev,
-			 "[%s--] CQ_EN/SW_SUB_CTL/SW_DONE [in] 0x%x/0x%x/0x%x [out] 0x%x/0x%x/0x%x\n",
+	dev_info(dev->dev,
+			 "[%s--] CQ_EN/SW_SUB_CTL/SW_DONE/INT_EN/INT_EN2/INT_EN6/INT_EN7 [in] 0x%x/0x%x/0x%x/0x%x/0x%x/0x%x/0x%x [out] 0x%x/0x%x/0x%x/0x%x/0x%x/0x%x/0x%x\n",
 			 __func__,
 			 readl_relaxed(dev->base_inner + REG_CQ_EN),
 			 readl_relaxed(dev->base_inner + REG_CTL_SW_SUB_CTL),
 			 readl_relaxed(dev->base_inner + REG_CTL_SW_PASS1_DONE),
+			 readl_relaxed(dev->base_inner + REG_CTL_RAW_INT_EN),
+			 readl_relaxed(dev->base_inner + REG_CTL_RAW_INT2_EN),
+			 readl_relaxed(dev->base_inner + REG_CTL_RAW_INT6_EN),
+			 readl_relaxed(dev->base_inner + REG_CTL_RAW_INT7_EN),
 			 readl_relaxed(dev->base + REG_CQ_EN),
 			 readl_relaxed(dev->base + REG_CTL_SW_SUB_CTL),
-			 readl_relaxed(dev->base + REG_CTL_SW_PASS1_DONE));
+			 readl_relaxed(dev->base + REG_CTL_SW_PASS1_DONE),
+			 readl_relaxed(dev->base + REG_CTL_RAW_INT_EN),
+			 readl_relaxed(dev->base + REG_CTL_RAW_INT2_EN),
+			 readl_relaxed(dev->base + REG_CTL_RAW_INT6_EN),
+			 readl_relaxed(dev->base + REG_CTL_RAW_INT7_EN));
 }
 
 void dump_aa_info(struct mtk_cam_ctx *ctx,

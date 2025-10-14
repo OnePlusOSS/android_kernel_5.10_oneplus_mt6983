@@ -9,8 +9,8 @@
 ** --------------------------- Revision History: --------------------------------
 ** 	<author>	<data>			<desc>
 ************************************************************************************/
-#ifndef _OPPO_BOOT_H
-#define _OPPO_BOOT_H
+#ifndef _OPLUS_BOOT_H
+#define _OPLUS_BOOT_H
 #include <soc/oplus/boot_mode_types.h>
 //#ifdef VENDOR_EDIT
 //extern static int get_boot_mode(void);

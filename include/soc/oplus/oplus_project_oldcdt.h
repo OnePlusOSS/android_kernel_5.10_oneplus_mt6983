@@ -4,8 +4,8 @@
  *
  *
  */
-#ifndef _OPPO_PROJECT_OLDCDT_H_
-#define _OPPO_PROJECT_OLDCDT_H_
+#ifndef _OPLUS_PROJECT_OLDCDT_H_
+#define _OPLUS_PROJECT_OLDCDT_H_
 
 enum{
     HW_VERSION__UNKNOWN,

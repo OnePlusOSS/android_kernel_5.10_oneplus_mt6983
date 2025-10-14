@@ -762,6 +762,11 @@
 };
 */
 &mt6375_typec {
+/*#ifndef OPLUS_FEATURE_CHG_BASIC*/
+		/*tcpc,rp_level = <0>;*/
+/*#else*/
+		tcpc,rp_level = <1>;
+/*#endif*/
 	port {
 		tcpc_typec_usb: endpoint@0 {
 			remote-endpoint = <&ssusb_mux>;

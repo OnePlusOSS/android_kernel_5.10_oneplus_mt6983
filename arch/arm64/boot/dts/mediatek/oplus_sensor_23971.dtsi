@@ -101,6 +101,7 @@
 			channel_3_min = <0>;
 			channel_3_max = <70000>;
 			reg_table_num = <2>; //WIFI
+                        sup_move_detect = <1>;
 		};
 	};
 /* sensor end */

@@ -721,6 +721,7 @@ static struct mtk_panel_params ext_params = {
 	.oplus_ofp_hbm_on_delay = 0,
 	.oplus_ofp_pre_hbm_off_delay = 0,
 	.oplus_ofp_hbm_off_delay = 0,
+        .oplus_ofp_need_to_sync_data_in_aod_unlocking = true,
 	.dyn_fps = {
 		.switch_en = 1, .vact_timing_fps = 60,
 	},
@@ -814,6 +815,7 @@ static struct mtk_panel_params ext_params_90hz = {
 	.oplus_ofp_hbm_on_delay = 0,
 	.oplus_ofp_pre_hbm_off_delay = 0,
 	.oplus_ofp_hbm_off_delay = 0,
+        .oplus_ofp_need_to_sync_data_in_aod_unlocking = true,
 	.dyn_fps = {
 		.switch_en = 1, .vact_timing_fps = 90,
 	},
@@ -907,6 +909,7 @@ static struct mtk_panel_params ext_params_120hz = {
         .oplus_ofp_hbm_on_delay = 0,
         .oplus_ofp_pre_hbm_off_delay = 2,
         .oplus_ofp_hbm_off_delay = 0,
+        .oplus_ofp_need_to_sync_data_in_aod_unlocking = true,
 	.dyn_fps = {
 		.switch_en = 1, .vact_timing_fps = 120,
 	},

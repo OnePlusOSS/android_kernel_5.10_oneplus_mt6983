@@ -19,7 +19,7 @@
 #define UFS_VENDOR_WDC         0x145
 #define UFS_VENDOR_PHISON_CUST 0xA25
 #ifdef CONFIG_SCSI_DEVICE_FEATURE
-#define UFS_VENDOR_RESERVE     0xA25
+#define UFS_VENDOR_RESERVE     0xEDF
 #endif
 /**
  * ufs_dev_fix - ufs device quirk info

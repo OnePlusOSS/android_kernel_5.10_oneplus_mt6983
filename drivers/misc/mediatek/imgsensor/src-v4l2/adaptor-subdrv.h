@@ -163,6 +163,8 @@ struct subdrv_entry {
 #ifdef OPLUS_FEATURE_CAMERA_COMMON
 	const struct subdrv_pw_seq_entry *aon_pw_seq;
 	int aon_pw_seq_cnt;
+	const struct subdrv_pw_seq_entry *pw_off_seq;
+	int pw_off_seq_cnt;
 #endif /*OPLUS_FEATURE_CAMERA_COMMON*/
 };
 

@@ -111,7 +111,7 @@
 			i2c_addr = <65>;
 			direction = <4>;
 			eint_num = <17>;
-			als_ratio = <1000>;
+			als_ratio = <200>;
 			als_buffer_length = <10>;
 			als_type = <1>;
 			device_name = "mn78911";

@@ -864,11 +864,13 @@ static int scsi_add_lun(struct scsi_device *sdev, unsigned char *inq_result,
 	if (inq_result[7] & 0x10)
 		sdev->sdtr = 1;
 
+	/*
 	sdev_printk(KERN_NOTICE, sdev, "%s %.8s %.16s %.4s PQ: %d "
 			"ANSI: %d%s\n", scsi_device_type(sdev->type),
 			sdev->vendor, sdev->model, sdev->rev,
 			sdev->inq_periph_qual, inq_result[2] & 0x07,
 			(inq_result[3] & 0x0f) == 1 ? " CCS" : "");
+	*/
 
 	if ((sdev->scsi_level >= SCSI_2) && (inq_result[7] & 2) &&
 	    !(*bflags & BLIST_NOTQ)) {

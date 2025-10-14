@@ -1586,9 +1586,10 @@ static int panel_hbm_set_cmdq(struct drm_panel *panel, void *dsi,
 
 	if (!en) {
 		lcm_setbacklight_cmdq(dsi, cb, handle, oplus_display_brightness);
-		if ((get_pwm_status(g_pwm_en)) && (oplus_display_brightness != 1)) {
+		if (get_pwm_status(g_pwm_en)) {
 			pwm_power_on = true;
-			oplus_display_panel_set_frequency_pwm(dsi, cb, handle, oplus_display_brightness);
+			if (oplus_display_brightness != 1)
+				oplus_display_panel_set_frequency_pwm(dsi, cb, handle, oplus_display_brightness);
 		}
 	}
 

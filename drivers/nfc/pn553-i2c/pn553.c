@@ -1611,16 +1611,19 @@ done:
         goto done;
     }
 
+    /* wait ven timing sequence which is required by nxp chipSet */
+    usleep_range(20000, 20100);
+
     gpio_set_value(firm_gpio, 1);
     /* hardware dependent delay */
-    usleep_range(10000, 10100);
+    usleep_range(20000, 20100);
     /* making sure that the NFCC starts in a clean state. */
     gpio_set_value(enable_gpio, 0);/* ULPM: Disable */
     /* hardware dependent delay */
-    usleep_range(10000, 10100);
+    usleep_range(20000, 20100);
     gpio_set_value(enable_gpio, 1);/* HPD : Enable*/
     /* hardware dependent delay */
-    usleep_range(10000, 10100);
+    usleep_range(20000, 20100);
 
     nci_get_fw_cmd[0] = 0x00;
     nci_get_fw_cmd[1] = 0x04;

@@ -75,6 +75,11 @@ static struct LCM_setting_table init_setting_60Hz[] = {
 	/* Sleep out */
 	{REGFLAG_CMD, 1, {0x11}},
 	{REGFLAG_DELAY, 120, {}},
+	/* ELVDD flow back */
+	{REGFLAG_CMD, 4, {0xFF,0x78,0x38,0x02}},
+	{REGFLAG_CMD, 2, {0x05,0x53}},
+	{REGFLAG_CMD, 4, {0xFF,0x78,0x38,0x1C}},
+	{REGFLAG_CMD, 2, {0x63,0x18}},
 	/* ESD Check */
 	{REGFLAG_CMD, 4, {0xFF,0x78,0x38,0x07}},
 	{REGFLAG_CMD, 2, {0x2B,0x24}},
@@ -144,6 +149,11 @@ static struct LCM_setting_table init_setting_90Hz[] = {
 	/* Sleep out */
 	{REGFLAG_CMD, 1, {0x11}},
 	{REGFLAG_DELAY, 120, {}},
+	/* ELVDD flow back */
+	{REGFLAG_CMD, 4, {0xFF,0x78,0x38,0x02}},
+	{REGFLAG_CMD, 2, {0x05,0x53}},
+	{REGFLAG_CMD, 4, {0xFF,0x78,0x38,0x1C}},
+	{REGFLAG_CMD, 2, {0x63,0x18}},
 	/* ESD Check */
 	{REGFLAG_CMD, 4, {0xFF,0x78,0x38,0x07}},
 	{REGFLAG_CMD, 2, {0x2B,0x24}},
@@ -213,6 +223,11 @@ static struct LCM_setting_table init_setting_120Hz[] = {
 	/* Sleep out */
 	{REGFLAG_CMD, 1, {0x11}},
 	{REGFLAG_DELAY, 120, {}},
+	/* ELVDD flow back */
+	{REGFLAG_CMD, 4, {0xFF,0x78,0x38,0x02}},
+	{REGFLAG_CMD, 2, {0x05,0x53}},
+	{REGFLAG_CMD, 4, {0xFF,0x78,0x38,0x1C}},
+	{REGFLAG_CMD, 2, {0x63,0x18}},
 	/* ESD Check */
 	{REGFLAG_CMD, 4, {0xFF,0x78,0x38,0x07}},
 	{REGFLAG_CMD, 2, {0x2B,0x24}},
@@ -239,7 +254,7 @@ static struct LCM_setting_table AOD_on_setting[] = {
         {REGFLAG_CMD,4,{0xFF,0x78,0x38,0x00}},
         {REGFLAG_CMD, 1, {0x39}},
         {REGFLAG_CMD,4,{0xFF,0x78,0x38,0x0C}},
-        {REGFLAG_CMD, 1, {0xBE,0x01}},
+        {REGFLAG_CMD, 2, {0xBE,0x01}},
         {REGFLAG_CMD,4,{0xFF,0x78,0x38,0x00}},
         {REGFLAG_END_OF_TABLE, 0x00, {}}
 };

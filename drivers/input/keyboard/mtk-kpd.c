@@ -65,6 +65,8 @@ struct mtk_keypad {
 
 #define KEY_LEVEL_DEFAULT				1
 
+struct wakeup_source *suspend_lock_data;
+
 struct vol_info {
 	unsigned int vol_up_irq;
 	unsigned int vol_down_irq;
@@ -510,7 +512,13 @@ static int kpd_request_named_gpio(struct vol_info *kpd,
 
 static irqreturn_t kpd_volumedown_irq_handler(int irq, void *dev_id)
 {
+	pr_info("%s:Enter!!\n", __func__);
+
 	disable_irq_nosync(vol_key_info.vol_down_irq);
+
+	__pm_wakeup_event(suspend_lock_data, 1000);
+
+	pr_info("%s:vol_down_irq!!\n", __func__);
 
 	/*tasklet_schedule(&kpd_volumekey_down_tasklet);*/
 	hrtimer_start(&vol_down_timer, ktime_set(0, VOL_DOWN_DELAY_TIME), HRTIMER_MODE_REL);
@@ -729,6 +737,8 @@ static int kpd_pdrv_probe(struct platform_device *pdev)
 		goto err_unregister_device;
 	}
 
+	suspend_lock_data = keypad->suspend_lock;
+
 	tasklet_init(&keypad->tasklet, kpd_keymap_handler,
 					(unsigned long)keypad);
 
@@ -833,6 +843,22 @@ err_unprepare_clk:
 	return ret;
 }
 
+static int kpd_pdrv_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	enable_irq_wake(vol_key_info.vol_down_irq);
+
+	pr_info("suspend!!\n");
+	return 0;
+}
+
+static int kpd_pdrv_resume(struct platform_device *pdev)
+{
+	disable_irq_wake(vol_key_info.vol_down_irq);
+
+	pr_info("resume!!\n");
+	return 0;
+}
+
 static int kpd_pdrv_remove(struct platform_device *pdev)
 {
 	struct mtk_keypad *keypad = platform_get_drvdata(pdev);
@@ -853,6 +879,8 @@ static const struct of_device_id kpd_of_match[] = {
 
 static struct platform_driver kpd_pdrv = {
 	.probe = kpd_pdrv_probe,
+	.suspend = kpd_pdrv_suspend,
+	.resume = kpd_pdrv_resume,
 	.remove = kpd_pdrv_remove,
 	.driver = {
 		   .name = KPD_NAME,

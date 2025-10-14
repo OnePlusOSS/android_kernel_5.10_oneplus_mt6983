@@ -184,6 +184,11 @@ static struct mml_frame_config *frame_config_create(
 		return ERR_PTR(-ENOMEM);
 	cfg = &dle_cfg->c;
 	mml_core_init_config(cfg);
+	if (!cfg->wq_done) {
+		mml_err("[dle] fail to alloc wq_done\n");
+		kfree(dle_cfg);
+		return ERR_PTR(-ENOMEM);
+	}
 
 	list_add(&cfg->entry, &ctx->configs);
 	ctx->config_cnt++;
@@ -850,6 +855,20 @@ static struct mml_dle_ctx *dle_ctx_create(struct mml_dev *mml,
 	ctx->config_cb = dl->config_cb;
 	ctx->wq_config = alloc_ordered_workqueue("mml_work_dl", WORK_CPU_UNBOUND | WQ_HIGHPRI, 0);
 
+	if (!ctx->wq_destroy || !ctx->wq_config) {
+		mml_err("[dle] fail to alloc workqueue\n");
+		if (ctx->wq_destroy) {
+			destroy_workqueue(ctx->wq_destroy);
+			ctx->wq_destroy = NULL;
+		}
+		if (ctx->wq_config) {
+			destroy_workqueue(ctx->wq_config);
+			ctx->wq_config = NULL;
+		}
+		kfree(ctx);
+		return ERR_PTR(-ENOMEM);
+	}
+
 	return ctx;
 }
 
@@ -881,8 +900,14 @@ static void dle_ctx_release(struct mml_dle_ctx *ctx)
 	}
 
 	mutex_unlock(&ctx->config_mutex);
-	destroy_workqueue(ctx->wq_destroy);
-	destroy_workqueue(ctx->wq_config);
+	if (ctx->wq_destroy) {
+		destroy_workqueue(ctx->wq_destroy);
+		ctx->wq_destroy = NULL;
+	}
+	if (ctx->wq_config) {
+		destroy_workqueue(ctx->wq_config);
+		ctx->wq_config = NULL;
+	}
 	kthread_flush_worker(&ctx->kt_done);
 	kthread_stop(ctx->kt_done_task);
 	kthread_destroy_worker(&ctx->kt_done);

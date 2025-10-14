@@ -9,8 +9,8 @@
  ** --------------------------- Revision History: --------------------------------         
  **  <author>    <data>          <desc>
  ************************************************************************************/     
-#ifndef _OPPO_BOOT_TYPE_H    
-#define _OPPO_BOOT_TYPE_H
+#ifndef _OPLUS_BOOT_TYPE_H    
+#define _OPLUS_BOOT_TYPE_H
 enum{
         MSM_BOOT_MODE__NORMAL,
         MSM_BOOT_MODE__FASTBOOT,

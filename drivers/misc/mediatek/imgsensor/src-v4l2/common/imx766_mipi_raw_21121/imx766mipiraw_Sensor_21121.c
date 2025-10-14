@@ -344,15 +344,15 @@ static struct imgsensor_info_struct imgsensor_info = {
     },
 
     .slim_video = { /* Reg_M-1 QBIN(HVBIN) - V2H2_FHD_2048x1152_120FPS */
-        .pclk = 3283200000,
+        .pclk = 1300800000,
         .linelength = 8816,
-        .framelength = 3100,
+        .framelength = 1228,
         .startx = 0,
         .starty = 0,
         .grabwindow_width = 2048,
         .grabwindow_height = 1152,
         .mipi_data_lp2hs_settle_dc = 85,
-        .mipi_pixel_rate = 1780800000,
+        .mipi_pixel_rate = 517030000,
         .max_framerate = 1200, /* 120fps */
     },
 
@@ -4107,8 +4107,8 @@ static struct mtk_mbus_frame_desc_entry frame_desc_slim[] = {
         .bus.csi2 = {
             .channel = 0,
             .data_type = 0x30,
-            .hsize = 1280,
-            .vsize = 288,
+            .hsize = 1024,
+            .vsize = 576,
             .user_data_desc = VC_PDAF_STATS,
         },
     },

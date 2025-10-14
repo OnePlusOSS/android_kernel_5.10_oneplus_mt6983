@@ -104,15 +104,11 @@
 
 	pinctrl-names = "default",
 			"charger_gpio_as_output_low",  /*Level 1 switch*/
-			"charger_gpio_as_output_high",
-			"dischg_enable",  /*Prevent burning control*/
-			"dischg_disable";
+			"charger_gpio_as_output_high";
 
 	pinctrl-0 = <&charger_pins_default>;
 	pinctrl-1 = <&charger_pins_eint_output0>;
 	pinctrl-2 = <&charger_pins_eint_output1>;
-	pinctrl-3 = <&dischg_enable>;
-	pinctrl-4 = <&dischg_disable>;
 
 
 	//for oplus chg framework:
@@ -301,7 +297,6 @@
 
 	//GPIO config:
 	qcom,chargerid_switch-gpio = <&pio 23 0x00>;
-	qcom,dischg-gpio = <&pio 50 0x00>;
 
 	qcom,vooc-max-input-volt-support = <11000>;     //10V
 	qcom,vooc-max-input-current-support = <3000>;   //6.5A
@@ -597,22 +592,6 @@
 		pins_cmd_dat {
 			pinmux = <PINMUX_GPIO23__FUNC_GPIO23>;
 			output-high;
-		};
-	};
-
-	dischg_enable: dischg_enable {
-		pins_cmd_dat {
-			pinmux = <PINMUX_GPIO50__FUNC_GPIO50>;
-			bias-pull-up;
-			output-high;
-		};
-	};
-
-	dischg_disable: dischg_disable {
-		pins_cmd_dat {
-			pinmux = <PINMUX_GPIO50__FUNC_GPIO50>;
-			bias-pull-down;
-			output-low;
 		};
 	};
 

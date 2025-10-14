@@ -140,6 +140,7 @@
 		fingerprint_not_report_in_suspend;
 		freq_hop_simulate_support;
 		health_monitor_support;
+		temperature_detect_shellback_support;
 
 		/*
 		 *Virtual Key Config:

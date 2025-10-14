@@ -1032,7 +1032,10 @@ static void core_taskdone_kt_work(struct kthread_work *work)
 			mmp_data2_fence(task->fence->context, task->fence->seqno));
 	}
 
-	queue_work(task->config->wq_done, &task->wq_work_done);
+	if (task->config && task->config->wq_done)
+		queue_work(task->config->wq_done, &task->wq_work_done);
+	else
+		mml_err("wq_done is NULL!!!");
 	mml_trace_end();
 }
 

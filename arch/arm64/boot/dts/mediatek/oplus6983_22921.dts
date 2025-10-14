@@ -823,6 +823,9 @@
 		touchpanel,pen-panel-coords = <20000 28000>;
 		touchpanel,pen-max-pressure = <4096>;
 		touchpanel,pen-max-tilt = <60 60>;
+		touchpanel,pen-id-map = <3 2
+					4 2
+					5 2>;
 		touchpanel,msecs-to-jiffies-time = <100>;
 		touchpanel,smooth-level = <0 1 2 6 8 10>;
 		touchpanel,smooth-level-charging = <2 3 7 8 9 10>;

@@ -570,7 +570,14 @@ struct LCM_setting_table_by_type lcd_init_on[] = {
 
 	{TYPE_DCS, 0x02, {0xFF, 0x20}},
 	{TYPE_DCS, 0x02, {0xFB, 0x01}},
+	{TYPE_DCS, 0x02, {0x2D, 0x02}},
+	{TYPE_DCS, 0x02, {0x2F, 0x02}},
 	{TYPE_DCS, 0x02, {0x32, 0x72}},
+	{TYPE_DCS, 0x02, {0x0D, 0x43}},
+
+	{TYPE_DCS, 0x02, {0xFF, 0x2A}},
+	{TYPE_DCS, 0x02, {0xFB, 0x01}},
+	{TYPE_DCS, 0x02, {0x9A, 0x05}},
 
 	{TYPE_DCS, 0x02, {0xFF, 0x10}},
 	{TYPE_DCS, 0x02, {0xFB, 0x01}},
@@ -873,16 +880,16 @@ static int boe_enable(struct drm_panel *panel)
 	return 0;
 }
 
-#define HFP (77)
+#define HFP (74)
 #define HSA (28)
 #define HBP (76)
 #define VSA (2)
 #define VBP (8)
 #define VAC (2408)
 #define HAC (1720)
-#define VFP_48hz (2220)
-#define VFP_50hz (2040)
-#define VFP_60hz (1290)
+#define VFP_48hz (2172)
+#define VFP_50hz (1988)
+#define VFP_60hz (1254)
 #define VFP_90hz (30)
 #define DYN_DATA_RATE (1080)
 #define DYN_HBP (56)
@@ -895,7 +902,7 @@ static int boe_enable(struct drm_panel *panel)
 
 
 static const struct drm_display_mode default_mode = {
-	.clock = 418828,
+	.clock = 416845,
 	.hdisplay = HAC,
 	.hsync_start = HAC + HFP,//HFP
 	.hsync_end = HAC + HFP + HSA,//HSA
@@ -907,39 +914,39 @@ static const struct drm_display_mode default_mode = {
 };
 
 static const struct drm_display_mode performance_mode_60hz = {
-	.clock = 340762,
+	.clock = 418167,
 	.hdisplay = HAC,
-	.hsync_start = HAC + HFP_TABB,//HFP
-	.hsync_end = HAC + HFP_TABB + HSA,//HSA
-	.htotal = HAC + HFP_TABB + HSA + HBP,//HBP
+	.hsync_start = HAC + HFP,//HFP
+	.hsync_end = HAC + HFP + HSA,//HSA
+	.htotal = HAC + HFP + HSA + HBP,//HBP
 	.vdisplay = VAC,
-	.vsync_start = VAC + VFP_60hz_TABB,//VFP
-	.vsync_end = VAC + VFP_60hz_TABB + VSA,//VSA
-	.vtotal = VAC + VFP_60hz_TABB + VSA + VBP,//VBP
+	.vsync_start = VAC + VFP_60hz,//VFP
+	.vsync_end = VAC + VFP_60hz + VSA,//VSA
+	.vtotal = VAC + VFP_60hz + VSA + VBP,//VBP
 };
 
 static const struct drm_display_mode performance_mode_50hz = {
-	.clock = 340576,
+	.clock = 418129,
 	.hdisplay = HAC,
-	.hsync_start = HAC + HFP_TABB,//HFP
-	.hsync_end = HAC + HFP_TABB + HSA,//HSA
-	.htotal = HAC + HFP_TABB + HSA + HBP,//HBP
+	.hsync_start = HAC + HFP,//HFP
+	.hsync_end = HAC + HFP + HSA,//HSA
+	.htotal = HAC + HFP + HSA + HBP,//HBP
 	.vdisplay = VAC,
-	.vsync_start = VAC + VFP_50hz_TABB,//VFP
-	.vsync_end = VAC + VFP_50hz_TABB + VSA,//VSA
-	.vtotal = VAC + VFP_50hz_TABB + VSA + VBP,//VBP
+	.vsync_start = VAC + VFP_50hz,//VFP
+	.vsync_end = VAC + VFP_50hz + VSA,//VSA
+	.vtotal = VAC + VFP_50hz + VSA + VBP,//VBP
 };
 
 static const struct drm_display_mode performance_mode_48hz = {
-	.clock = 340762,
+	.clock = 418167,
 	.hdisplay = HAC,
-	.hsync_start = HAC + HFP_TABB,//HFP
-	.hsync_end = HAC + HFP_TABB + HSA,//HSA
-	.htotal = HAC + HFP_TABB + HSA + HBP,//HBP
+	.hsync_start = HAC + HFP,//HFP
+	.hsync_end = HAC + HFP + HSA,//HSA
+	.htotal = HAC + HFP + HSA + HBP,//HBP
 	.vdisplay = VAC,
-	.vsync_start = VAC + VFP_48hz_TABB,//VFP
-	.vsync_end = VAC + VFP_48hz_TABB + VSA,//VSA
-	.vtotal = VAC + VFP_48hz_TABB + VSA + VBP,//VBP
+	.vsync_start = VAC + VFP_48hz,//VFP
+	.vsync_end = VAC + VFP_48hz + VSA,//VSA
+	.vtotal = VAC + VFP_48hz + VSA + VBP,//VBP
 };
 
 #if defined(CONFIG_MTK_PANEL_EXT)
@@ -948,7 +955,6 @@ static struct mtk_panel_params ext_params_60hz = {
 	.lcm_index = 0,
 //	.pll_clk = 580,
 //	.vfp_low_power = 1298,
-	.oplus_more_frame_bw = true,
 	.cust_esd_check = 1,
 	.esd_check_enable = 1,
 	.esd_te_check_gpio = 1,
@@ -1083,10 +1089,10 @@ static struct mtk_panel_params ext_params_60hz = {
 		.switch_en = 1,
 		.data_rate = DYN_DATA_RATE,
 		.vsa = VSA,
-		.vfp = VFP_60hz_TABB,
+		.vfp = VFP_60hz,
 		.vbp = VBP,
 		.hsa = HSA,
-		.hfp = HFP_TABB,
+		.hfp = HFP,
 		.hbp = DYN_HBP,
 	},
 	.corner_pattern_height = ROUND_CORNER_H_TOP,
@@ -1100,7 +1106,6 @@ static struct mtk_panel_params ext_params_50hz = {
 	.lcm_index = 0,
 //	.pll_clk = 580,
 //	.vfp_low_power = 2044,
-	.oplus_more_frame_bw = true,
 	.cust_esd_check = 1,
 	.esd_check_enable = 1,
 	.esd_te_check_gpio = 1,
@@ -1235,10 +1240,10 @@ static struct mtk_panel_params ext_params_50hz = {
 		.switch_en = 1,
 		.data_rate = DYN_DATA_RATE,
 		.vsa = VSA,
-		.vfp = VFP_50hz_TABB,
+		.vfp = VFP_50hz,
 		.vbp = VBP,
 		.hsa = HSA,
-		.hfp = HFP_TABB,
+		.hfp = HFP,
 		.hbp = DYN_HBP,
 	},
 	.corner_pattern_height = ROUND_CORNER_H_TOP,
@@ -1252,7 +1257,6 @@ static struct mtk_panel_params ext_params_48hz = {
 	.lcm_index = 0,
 	//.pll_clk = 580,
 //	.vfp_low_power = 2231,
-	.oplus_more_frame_bw = true,
 	.cust_esd_check = 1,
 	.esd_check_enable = 1,
 	.esd_te_check_gpio = 1,
@@ -1387,10 +1391,10 @@ static struct mtk_panel_params ext_params_48hz = {
 		.switch_en = 1,
 		.data_rate = DYN_DATA_RATE,
 		.vsa = VSA,
-		.vfp = VFP_48hz_TABB,
+		.vfp = VFP_48hz,
 		.vbp = VBP,
 		.hsa = HSA,
-		.hfp = HFP_TABB,
+		.hfp = HFP,
 		.hbp = DYN_HBP,
 	},
 	.corner_pattern_height = ROUND_CORNER_H_TOP,
@@ -1403,8 +1407,7 @@ static struct mtk_panel_params ext_params_48hz = {
 static struct mtk_panel_params ext_params = {
 	.lcm_index = 0,
 //	.pll_clk = 580,
-	//.vfp_low_power = VFP_60hz,
-	.oplus_more_frame_bw = true,
+	.vfp_low_power = VFP_60hz,
 	.cust_esd_check = 1,
 	.esd_check_enable = 1,
 	.esd_te_check_gpio = 1,

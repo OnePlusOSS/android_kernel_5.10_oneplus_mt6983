@@ -87,6 +87,7 @@
 		//spi_port_support;
 		fw_update_app_support;
 		fingerprint_underscreen_support;
+		fp_disable_after_resume;
 		freq_hop_simulate_support;
 		report_flow_unlock_support;
 		screenoff_fingerprint_info_support;

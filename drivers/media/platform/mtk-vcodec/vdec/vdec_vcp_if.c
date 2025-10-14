@@ -26,6 +26,7 @@
 #else
 #define IPI_TIMEOUT_MS          (5000U + ((mtk_vcodec_dbg | mtk_v4l2_dbg_level) ? 5000U : 0U))
 #endif
+#define IPI_FIRST_DEC_START_TIMEOUT_MS     (60000U)
 
 struct vcp_dec_mem_list {
 	struct vcodec_mem_obj mem;
@@ -194,7 +195,11 @@ static int vdec_vcp_ipi_send(struct vdec_inst *inst, void *msg, int len, bool is
 	if (!is_ack) {
 wait_ack:
 		/* wait for VCP's ACK */
-		timeout = msecs_to_jiffies(IPI_TIMEOUT_MS);
+		if (*(__u32 *)msg == AP_IPIMSG_DEC_START && inst->ctx->state == MTK_STATE_INIT)
+			timeout = msecs_to_jiffies(IPI_FIRST_DEC_START_TIMEOUT_MS);
+		else
+			timeout = msecs_to_jiffies(IPI_TIMEOUT_MS);
+
 		ret = wait_event_timeout(*msg_wq, *msg_signaled, timeout);
 		*msg_signaled = false;
 

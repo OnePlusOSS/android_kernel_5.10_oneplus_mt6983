@@ -1160,9 +1160,6 @@ static bool is_usb_rdy(struct device *dev)
 static int mt6375_chg_enable_bc12(struct mt6375_chg_data *ddata, bool en)
 {
 	int i, ret, attach;
-#ifdef OPLUS_FEATURE_CHG_BASIC
-	static bool first_start = true;
-#endif
 	static const int max_wait_cnt = 250;
 
 	mt_dbg(ddata->dev, "en=%d\n", en);
@@ -1195,11 +1192,8 @@ static int mt6375_chg_enable_bc12(struct mt6375_chg_data *ddata, bool en)
 	if (ret)
 		return ret;
 #ifdef OPLUS_FEATURE_CHG_BASIC
-	if (g_support_icl_optimization && en && first_start) {
-		first_start = false;
-		printk("%s: enable first_start = %d\n", __func__, first_start);
+	if (g_support_icl_optimization && en)
 		mt6375_chg_field_set(ddata, F_BC12_EN, 0);
-	}
 #endif
 	return mt6375_chg_field_set(ddata, F_BC12_EN, en);
 }
@@ -3075,21 +3069,11 @@ static int mt6375_chg_init_setting(struct mt6375_chg_data *ddata)
 		return ret;
 	}
 
-#ifdef OPLUS_FEATURE_CHG_BASIC
-	if (!g_support_icl_optimization) {
-		ret = mt6375_chg_field_set(ddata, F_BC12_EN, 0);
-		if (ret < 0) {
-			dev_err(ddata->dev, "failed to disable bc12\n");
-			return ret;
-		}
-	}
-#else
 	ret = mt6375_chg_field_set(ddata, F_BC12_EN, 0);
 	if (ret < 0) {
 		dev_err(ddata->dev, "failed to disable bc12\n");
 		return ret;
 	}
-#endif
 
 	/* set aicr = 200mA in 1:META_BOOT 5:ADVMETA_BOOT */
 	if (pdata->boot_mode == 1 || pdata->boot_mode == 5) {

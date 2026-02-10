@@ -191,4 +191,3 @@ config MTK_FLASHLIGHT_DLPT
 	  Dynamic low power throttling is a mechanism to monitor
 	  the current of battary dynamicly. It will start by request
 	  and notice user by kernel notifier.
-

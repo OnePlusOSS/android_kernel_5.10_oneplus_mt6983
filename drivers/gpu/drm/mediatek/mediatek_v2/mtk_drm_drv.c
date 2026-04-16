@@ -679,6 +679,10 @@ static bool mtk_atomic_need_force_doze_switch(struct drm_crtc *crtc)
 	    drm_atomic_crtc_needs_modeset(crtc->state))
 		return false;
 
+	if (!crtc->state->active_changed &&
+		!crtc->state->active && mtk_state->doze_changed)
+	return false;
+
 	DDPINFO("%s crtc%d, active:%d, doze_active:%d\n", __func__,
 		drm_crtc_index(crtc), crtc->state->active,
 		mtk_state->prop_val[CRTC_PROP_DOZE_ACTIVE]);

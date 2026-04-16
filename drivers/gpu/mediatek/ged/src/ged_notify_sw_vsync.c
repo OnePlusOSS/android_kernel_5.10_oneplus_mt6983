@@ -474,16 +474,12 @@ void ged_dvfs_gpu_clock_switch_notify(bool bSwitch)
 #endif /* GED_DCS_POLICY */
 
 		g_bGPUClock = true;
-		if (g_timer_on) {
-			ged_log_buf_print(ghLogBuf_DVFS,
-				"[GED_K] Timer Already Start");
-		} else {
-			hrtimer_start(&g_HT_hwvsync_emu,
+		ged_log_buf_print(ghLogBuf_DVFS, "[GED_K] Buck-on; Cancel timer");
+		hrtimer_cancel(&g_HT_hwvsync_emu);
+		hrtimer_start(&g_HT_hwvsync_emu,
 			ns_to_ktime(GED_DVFS_TIMER_TIMEOUT), HRTIMER_MODE_REL);
-			ged_log_buf_print(ghLogBuf_DVFS,
-				"[GED_K] HW Start Timer");
-			timer_switch(true);
-		}
+		ged_log_buf_print(ghLogBuf_DVFS, "[GED_K] Start timer");
+		timer_switch(true);
 		ged_log_perf_trace_counter("gpu_state",
 			1, 5566, 0, 0);
 	} else {

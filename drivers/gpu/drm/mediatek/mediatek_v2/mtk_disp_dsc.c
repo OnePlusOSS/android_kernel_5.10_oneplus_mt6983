@@ -328,8 +328,7 @@ static void mtk_dsc1_config(struct mtk_ddp_comp *comp,
 	struct mtk_panel_dsc_params *dsc_params;
 	struct mtk_panel_spr_params *spr_params;
 
-	if (!comp->mtk_crtc || (!comp->mtk_crtc->panel_ext
-				&& !comp->mtk_crtc->is_dual_pipe))
+	if (!comp->mtk_crtc || !comp->mtk_crtc->panel_ext)
 		return;
 //	mtk_dsc_default_setting();
 
@@ -748,8 +747,7 @@ static void mtk_dsc_config(struct mtk_ddp_comp *comp,
 	struct mtk_panel_dsc_params *dsc_params;
 	struct mtk_panel_spr_params *spr_params;
 
-	if (!comp->mtk_crtc || (!comp->mtk_crtc->panel_ext
-				&& !comp->mtk_crtc->is_dual_pipe))
+	if (!comp->mtk_crtc || (!comp->mtk_crtc->panel_ext))
 		return;
 //	mtk_dsc_default_setting();
 

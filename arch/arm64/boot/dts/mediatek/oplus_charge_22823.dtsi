@@ -92,6 +92,7 @@
 	qcom,chargerid_support;
 	qcom,smart_chg_soh_support;
 	oplus_spec,dec-vol-fv-mv = <40>;
+	oplus,full_limit_curr_support;
 	qcom,smart_charging_screenoff;
 	qcom,support_usbtemp_protect_v2;
 	qcom,usbtemp_batt_temp_low = <50>;
@@ -150,6 +151,7 @@
 	sw_full_count = <25>;
 	qcom,iterm_ma = <251>;
 	qcom,recharge-mv = <100>;
+	oplus,batt_full_time = <60>;
 	qcom,batt_capacity_mah = <5000>;/*typical capacity*/
 
 	qcom,removed_bat_decidegc = <390>;  /*<-39C*/
@@ -296,7 +298,6 @@
 	qcom,ccdetect_by_wd0;
 
 	qcom,support_abnormal_adapter;
-	oplus,full_limit_curr_support;
 
 	oplus,poweroff_high_batt_temp = <720>;
 	oplus,poweroff_emergency_batt_temp = <770>;
@@ -1716,12 +1717,12 @@
 		reg = <0x5c 0>;
 
 		qcom,mps_otg_en-gpio = <&pio 30 0x00>;
-		support_icl_optimization;
 
 		pinctrl-names = "mps_otg_en_active", "mps_otg_en_sleep", "mps_otg_en_default";
 		pinctrl-0 = <&mps_otg_en_active>;
 		pinctrl-1 = <&mps_otg_en_sleep>;
 		pinctrl-2 = <&mps_otg_en_default>;
+		support_icl_optimization;
 	};
 };
 

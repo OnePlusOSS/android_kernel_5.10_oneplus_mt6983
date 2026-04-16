@@ -1160,9 +1160,6 @@ static bool is_usb_rdy(struct device *dev)
 static int mt6375_chg_enable_bc12(struct mt6375_chg_data *ddata, bool en)
 {
 	int i, ret, attach;
-#ifdef OPLUS_FEATURE_CHG_BASIC
-	static bool first_start = true;
-#endif
 	static const int max_wait_cnt = 250;
 
 	mt_dbg(ddata->dev, "en=%d\n", en);
@@ -1194,13 +1191,6 @@ static int mt6375_chg_enable_bc12(struct mt6375_chg_data *ddata, bool en)
 		ret = mt6375_chg_set_usbsw(ddata, en ? USBSW_CHG : USBSW_USB);
 	if (ret)
 		return ret;
-#ifdef OPLUS_FEATURE_CHG_BASIC
-	if (g_support_icl_optimization && en && first_start) {
-		first_start = false;
-		printk("%s: enable first_start = %d\n", __func__, first_start);
-		mt6375_chg_field_set(ddata, F_BC12_EN, 0);
-	}
-#endif
 	return mt6375_chg_field_set(ddata, F_BC12_EN, en);
 }
 
@@ -2948,6 +2938,13 @@ static int mt6375_chg_apply_dt(struct mt6375_chg_data *ddata)
 	for (i = 0; i < ARRAY_SIZE(mt6375_chg_dtprops); i++) {
 		dp = &mt6375_chg_dtprops[i];
 		val = pdata_get_val(dev_get_platdata(ddata->dev), dp);
+#ifdef OPLUS_FEATURE_CHG_BASIC
+		if (g_support_icl_optimization &&
+		   (strncmp(dp->name, "aicr", 4) == 0)) {
+			dev_err(ddata->dev, "dont set icl, keep icl setting in lk\n");
+			continue;
+		}
+#endif
 		ret = mt6375_chg_field_set(ddata, dp->field, val);
 		if (ret < 0) {
 			dev_err(ddata->dev, "failed to write dtprop %s\n",
@@ -3075,21 +3072,11 @@ static int mt6375_chg_init_setting(struct mt6375_chg_data *ddata)
 		return ret;
 	}
 
-#ifdef OPLUS_FEATURE_CHG_BASIC
-	if (!g_support_icl_optimization) {
-		ret = mt6375_chg_field_set(ddata, F_BC12_EN, 0);
-		if (ret < 0) {
-			dev_err(ddata->dev, "failed to disable bc12\n");
-			return ret;
-		}
-	}
-#else
 	ret = mt6375_chg_field_set(ddata, F_BC12_EN, 0);
 	if (ret < 0) {
 		dev_err(ddata->dev, "failed to disable bc12\n");
 		return ret;
 	}
-#endif
 
 	/* set aicr = 200mA in 1:META_BOOT 5:ADVMETA_BOOT */
 	if (pdata->boot_mode == 1 || pdata->boot_mode == 5) {
@@ -3371,40 +3358,6 @@ bool mt6375_int_chrdet_attach(void)
 	}
 }
 EXPORT_SYMBOL(mt6375_int_chrdet_attach);
-
-int mt6375_force_get_port_stat_to_icl(void)
-{
-	int ret, current_limit = 0;
-	u32 val;
-
-	if (NULL == oplus_ddata) {
-		return -EINVAL;
-	}
-
-	ret = mt6375_chg_field_get(oplus_ddata, F_PORT_STAT, &val);
-	switch (val) {
-	case PORT_STAT_NOINFO:
-	case PORT_STAT_SDP:
-		current_limit = 500;
-		break;
-	case PORT_STAT_CDP:
-		current_limit = 1500;
-		break;
-	case PORT_STAT_APPLE_10W:
-	case PORT_STAT_SAMSUNG:
-	case PORT_STAT_APPLE_5W:
-	case PORT_STAT_APPLE_12W:
-	case PORT_STAT_UNKNOWN_TA:
-	case PORT_STAT_DCP:
-		current_limit = 2000;
-		break;
-	default:
-		current_limit = 2000;
-		break;
-	}
-	return current_limit;
-}
-EXPORT_SYMBOL(mt6375_force_get_port_stat_to_icl);
 #endif
 
 static ssize_t shipping_mode_store(struct device *dev,

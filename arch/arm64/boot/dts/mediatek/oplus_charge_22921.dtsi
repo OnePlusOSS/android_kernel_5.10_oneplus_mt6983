@@ -172,7 +172,7 @@
 	//sw_full_count = <25>;
 	qcom,iterm_ma = <255>;
 	qcom,recharge-mv = <100>;
-
+	oplus,batt_full_time = <60>;
 	qcom,batt_capacity_mah = <9230>; /*rated capacity*/
 	qcom,usb_high_than_bat_decidegc = <168>;
 

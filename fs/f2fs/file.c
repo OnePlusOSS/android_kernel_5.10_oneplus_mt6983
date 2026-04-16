@@ -5928,8 +5928,7 @@ static int reserve_compress_blocks(struct dnode_of_data *dn, pgoff_t count)
 
 	while (count) {
 		int compr_blocks = 0;
-		blkcnt_t reserved = 0;
-		blkcnt_t to_reserved;
+		blkcnt_t reserved;
 		int ret;
 
 		for (i = 0; i < cluster_size; i++, dn->ofs_in_node++) {
@@ -5941,10 +5940,7 @@ static int reserve_compress_blocks(struct dnode_of_data *dn, pgoff_t count)
 				dn->ofs_in_node += cluster_size;
 				goto next;
 			}
-			if (blkaddr == NEW_ADDR) {
-				reserved++;
-				continue;
-			}
+
 			if (__is_valid_data_blkaddr(blkaddr)) {
 				compr_blocks++;
 				continue;
@@ -5954,17 +5950,12 @@ static int reserve_compress_blocks(struct dnode_of_data *dn, pgoff_t count)
 			f2fs_set_data_blkaddr(dn);
 		}
 
-		to_reserved = cluster_size - compr_blocks - reserved;
-		if (reserved && to_reserved == 1) {
-			dn->ofs_in_node += cluster_size;
- 			goto next;
-		}
-
+		reserved = cluster_size - compr_blocks;
 		if (time_to_inject(sbi, FAULT_COMPRESS_RESERVE_NOSPC)) {
 			f2fs_show_injection_info(sbi, FAULT_COMPRESS_RESERVE_NOSPC);
 			return -ENOSPC;
 		}
-		ret = inc_valid_block_count(sbi, dn->inode, &to_reserved);
+		ret = inc_valid_block_count(sbi, dn->inode, &reserved);
 		if (ret)
 			return ret;
 
@@ -5973,7 +5964,7 @@ static int reserve_compress_blocks(struct dnode_of_data *dn, pgoff_t count)
 
 		f2fs_i_compr_blocks_update(dn->inode, compr_blocks, true);
 
-		reserved_blocks += to_reserved;
+		reserved_blocks += reserved;
 next:
 		count -= cluster_size;
 	}
